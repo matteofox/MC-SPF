@@ -1,0 +1,393 @@
+#!/usr/bin/env python
+
+import numpy as np
+import astropy.io.fits as fits
+import astropy.io.ascii as ascii
+import astropy.table as table
+import glob, os, sys
+import pymultinest
+import argparse
+import matplotlib.pyplot as pl
+from matplotlib.ticker import MultipleLocator
+from scipy.interpolate import interp1d
+from astropy.cosmology import FlatLambdaCDM
+try:
+  import corner as triangle
+except:
+  import triangle
+
+from mcspf.routines import sps_spec_fitter, redir_stdout
+from mcspf.routines import sfh as sfh
+from mcspf.utils    import plotspec as pltsp
+
+pl.rc('text', usetex=True)
+
+cosmo=FlatLambdaCDM(H0=70,Om0=0.3)
+
+parser = argparse.ArgumentParser(description='MonteCarlo Stellar Population Fitting Code')
+parser.add_argument('incat',    help='Path of the input catalogue')
+parser.add_argument('filtfile', help='Path of the filter translation file')
+parser.add_argument('mode',     help='Please select the run mode: FIT, FITPHOT, FITSPEC or PLOT')
+parser.add_argument('--objlist', default= None,  help='String with the IDs of the objects to fit separated by a space')
+parser.add_argument('--nlive',   default= 500,   help='Number of live points in the Multinest solver, default=500')
+parser.add_argument('--sampeff', default= 0.7,   help='Sampling efficiency in the Multinest solver. Lower is more precise and computationally expensive, default=0.7')
+parser.add_argument('--sfh',     default= 'exp', help='The form of the SFH, allowed values are exp for exponential and del for delayed tau models , default=exp')
+parser.add_argument('--outdir',  default= './',  help='Full path for the output directory. Default is cwd.')
+parser.add_argument('--fullout', dest='fullout', action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
+
+args = parser.parse_args()
+
+
+if args.mode =='FITPHOT':
+   fit_spec = False
+   fit_phot = True
+elif args.mode =='FITSPEC':
+   fit_spec = True
+   fit_phot = False
+elif args.mode == 'FIT':
+   fit_spec = True
+   fit_phot = True      
+
+
+#Setup directories
+if args.outdir =='./':
+   rootdir = os.getcwd()+'/'
+else:
+   rootdir = args.outdir
+
+modeldir = os.path.dirname(sys.modules['mcspf'].__file__)+'/models/'
+
+#Choose SFH
+if args.sfh =='exp':
+   model_file = modeldir+'SPS/Models_exp_bc03hr.fits'
+elif args.sfh =='del':
+   model_file = modeldir+'SPS/Models_del_bc03hr.fits'
+else:
+   print("SFH not understood aborting...")
+   exit()
+
+plotdir         = rootdir+'Plots/'
+fitsdir         = rootdir+'Fits/'
+
+if not os.path.isdir(fitsdir):
+       os.makedirs(fitsdir)
+       
+if not os.path.isdir(plotdir):
+       os.makedirs(plotdir)
+
+out_fmt         = fitsdir+'id{0}_'
+fit_file        = 'Fit_values.txt'
+
+#Open galaxy catalogue
+catalogue = table.Table(fits.open(args.incat)[1].data)
+colnames = catalogue.colnames
+
+if args.objlist is None:
+   nobj = len(catalogue)
+   objlist = catalogue['id']
+else:
+   objlist = np.array(args.objlist.split(), dtype=int)
+   nobj = len(objlist)
+
+#Open filter file
+ffilt = np.loadtxt(args.filtfile, dtype=object) 
+fsps_filt = dict(zip(ffilt[:,0], ffilt[:,1]))
+
+#Resolution file
+res_file = rootdir+'Extracted_resolution_muse.fits'
+
+print("Fitting {} objects".format(nobj))
+print("Model file {0} ".format(os.path.basename(model_file)))
+
+for ind in range(nobj):
+    
+    obj = objlist[ind]
+    try:
+      catind = np.where(catalogue['id']==obj)[0][0]
+    except:
+      print("Object {} is missing from the input catalogue. Skipping...".format(obj))
+    
+    this_obj_z = catalogue['z_best'][catind]
+    
+    print("{0}) Fitting obj {1} with z {2:5.4f} ".format(str(ind+1).rjust(4), obj, this_obj_z))
+
+    this_obj_flux, this_obj_err, this_obj_bands, this_obj_islim = [], [], [], []
+   
+    for col in colnames:
+       #------- INPUT UNITS --------
+       #Flux input must be in mJy for all the bands. A few lines 
+       #below it is converted into erg s^-1 cm^-2 Hz^-1 = 1E-26 mJy
+       #----------------------------
+       #Is this a flux column?
+       if col[:2].upper() == 'F_':      
+          #Which band is this column for?
+          photband = col[2:]
+          if photband in fsps_filt.keys():         
+           flux = catalogue[col][catind] 
+           errf = catalogue[col.replace('f_','e_')][catind] 
+           
+           if flux < -90:
+             continue
+           
+           SNR = flux/errf
+           if SNR>2:
+             this_obj_flux.append(flux * 1E-26)
+             this_obj_err.append(errf * 1E-26)
+             this_obj_islim.append(0)
+           else:
+             this_obj_flux.append(0.)
+             this_obj_err.append(errf * 1E-26)
+             this_obj_islim.append(1)
+           
+           this_obj_bands.append(fsps_filt[photband])
+       
+    this_obj_flux  = np.asarray(this_obj_flux)
+    this_obj_err   = np.asarray(this_obj_err)
+    this_obj_islim = np.asarray(this_obj_islim)
+    this_obj_bands = np.asarray(this_obj_bands)  
+    
+    print("      Object detected in {} out of {} bands".format(len(this_obj_flux)-np.sum(this_obj_islim), len(this_obj_flux)))
+   
+    try:
+      spec_file = catalogue['spec_file'][catind]
+      print("      Found Spectrum {}".format(spec_file))
+    except:
+      spec_file = None
+      
+    try:
+      res_file =  catalogue['res_file'][catind]
+    except:
+      res_file = None
+   
+    parameters = ['tau', 'age', 'Av', 'sigma', 'vel', 'lnf', 'a_ext', 'alpha', 'lmass', 'sigma_gas', 'age_gas', 'ion_gas', 'lyscale']
+    
+    ndim = len(parameters)
+            
+    #Start with no priors on all parameters
+    Gpriors = np.tile('none', 2*ndim).astype(object)  
+            
+    priorAext = [1.17,0.01]
+
+    if args.mode =='FIT' or args.mode=='FITSPEC' or args.mode == 'FITPHOT':
+    
+      with sps_spec_fitter(this_obj_z, model_file, this_obj_flux, this_obj_err, \
+               this_obj_bands, this_obj_islim, spec_in=spec_file, \
+               res_in=res_file, filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
+               Gpriors=Gpriors, priorAext=priorAext, fit_spec=fit_spec, fit_phot=fit_phot, \
+               polymax=3, cosmo=cosmo) as temp:
+    
+          pymultinest.run(temp.lnlhood, temp._scale_cube, ndim, sampling_efficiency=args.sampeff, resume=False, \
+                   outputfiles_basename=out_fmt.format(obj), verbose=True, multimodal=False, \
+                   importance_nested_sampling=False, n_live_points=args.nlive, n_iter_before_update=500, \
+                   evidence_tolerance=0.5)
+
+          if not args.fullout:
+             try:
+               os.remove('{0}ev.dat'.format(out_fmt.format(obj)))
+             except:
+               pass
+             try:  
+               os.remove('{0}phys_live.points'.format(out_fmt.format(obj)))
+             except:
+               pass
+             try:
+               os.remove('{0}live.points'.format(out_fmt.format(obj)))
+             except:
+               pass    
+
+    
+    elif args.mode == 'PLOT':
+        
+        if os.path.exists('{0}post_equal_weights.dat'.format(out_fmt.format(obj))):
+    
+          with sps_spec_fitter(this_obj_z, model_file, this_obj_flux, this_obj_err, \
+                this_obj_bands, this_obj_islim, spec_in=spec_file, \
+                filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
+                res_in=res_file, polymax=3, cosmo=cosmo) as temp:
+                            
+            a = pymultinest.Analyzer(n_params=ndim, outputfiles_basename=out_fmt.format(obj))
+            values = a.get_equal_weighted_posterior()
+            
+            stat = a.get_stats()
+
+            lnz, dlnz = stat['global evidence'], stat['global evidence error']
+            print('  Nested Sampling Ln(z):   {0:6.3f}'.format(lnz))
+
+            fig = pl.figure(figsize=(12,8), dpi=200)
+            
+            #Photometry plot
+            ax1 = fig.add_axes([0.08,0.08,0.38,0.25])
+            ax1.set_xscale('log')
+            ax1.set_yscale('log')
+            
+            #Spectroscopy and spec residuals
+            ax2 = fig.add_axes([0.08,0.5,0.89,0.3])
+            ax3 = fig.add_axes([0.08,0.40,0.89,0.10])
+                           
+            #SFH and corner plot
+            ax4 = fig.add_axes([0.51,0.08,0.25,0.25])
+            ax5 = fig.add_axes([0.82,0.08,0.15,0.25])
+              
+            meds  = np.percentile(values, 50, axis=0)
+            percs = np.transpose(np.percentile(values, [16,50,84], axis=0))
+            
+            for i in range(ndim):
+             print('  Best fit for parameter {0}: {1:8.3f} + {2:7.3f} - {3:7.3f}'.format(parameters[i].ljust(10), meds[i], abs(percs[i,2]-meds[i]), abs(percs[i,0]-meds[i])))
+            
+            #Calculate SFR
+            nsamp = 500
+            sfr_samp = np.zeros(nsamp)
+            rsamples = np.random.randint(values.shape[0], size=nsamp)
+            
+            for ind,ii in enumerate(rsamples):
+                tsamp = values[ii,:-1]
+                sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0],sfh.expsfh)*10**(tsamp[8]))
+            
+            medlsfr  = np.percentile(sfr_samp, 50)
+            perclsfr = np.percentile(sfr_samp, [16,50,84])
+            print('  Best fit for parameter {0}: {1:8.3f} + {2:7.3f} - {3:7.3f} (DERIVED)'.format('lSFR'.ljust(10), medlsfr, abs(perclsfr[2]-medlsfr), abs(perclsfr[0]-medlsfr)))
+            
+            zupd = (1.+this_obj_z)*(1.+meds[4]*1e13/temp.clight)-1
+
+            mflux, mphot = temp.reconstruct_phot(meds, ndim)
+            
+            #Compute photometric chisquare
+            oflux_lam = this_obj_flux* temp.clight/temp.pivot_wl**2
+            oflux_err_lam = this_obj_err* temp.clight/temp.pivot_wl**2
+                            
+            photo_chisq = np.nansum(((oflux_lam-mflux)/oflux_err_lam)**2)
+            photo_chisq /= len(this_obj_flux)
+            
+            print('  Reduced Phot Chi square: {0:7.3f}'.format(photo_chisq))
+            
+            #Set this up even if a spectrum is not present.
+            
+            ax2.set_ylabel(r'$f_\lambda [10^{-18}~\mathrm{erg~s^{-1}~cm^{-2}~\AA^{-1}}]$')
+            ax2.text(0.01, 0.90, r'$\mathrm{{ID}} = {0}$'.format(obj), transform=ax2.transAxes)
+            ax2.text(0.01, 0.84, r'$z = {0:.5f}$'.format(this_obj_z), transform=ax2.transAxes)
+            ax2.text(0.01, 0.77, r'$\log(M_*) = {0:.2f}$'.format(meds[8]), transform=ax2.transAxes)
+            ax2.text(0.01, 0.70, r'$\log(SFR) = {0:.3f}$'.format(medlsfr), transform=ax2.transAxes)
+            ax2.text(0.01, 0.63, r'$\ln Z = {0:.2f}\pm{1:.2f}$'.format(lnz, dlnz), transform=ax2.transAxes)
+            ax3.set_xlabel(r'$\lambda~\mathrm{rest}~[\mathrm{\AA}]$')
+            
+            if spec_file is not None:
+               #Reconstruct spectral fit on original grid
+               totspec = temp.reconstruct_spec(meds, ndim)
+               
+               #Plot spectral points
+               pl.sca(ax2)
+               
+               pltsp.plotspec(10**temp.log_wl, temp.log_obj*temp.spec_norm*0.01, color='black',    mask=temp.goodpix_spec,  zorder=1.05)                
+               pltsp.plotspec(10**temp.log_wl, temp.log_obj*temp.spec_norm*0.01, color='darkgrey', mask=~temp.goodpix_spec, zorder=1.05)
+               clean_spec = temp.cont_spec*temp.spec_norm*0.01 #go from 1e-20 to 1e-18
+               
+               ax2.plot(10**temp.log_wl, totspec*temp.spec_norm*0.01, '-', alpha=1.0, color='firebrick', lw=1.0, zorder=1.1)
+               ax2.axis([4650/(1+zupd),9200/(1+zupd),clean_spec.min()-0.1*clean_spec.ptp(),clean_spec.max()+0.3*clean_spec.ptp()])
+               
+
+               ax2.xaxis.set_major_locator(MultipleLocator(500))
+               ax2.xaxis.set_minor_locator(MultipleLocator(100))
+       
+               for tick in ax2.xaxis.get_major_ticks():
+                   tick.label1On=False
+
+               #Plot spectral residuals
+               ax3.plot(10**temp.log_wl[temp.goodpix_spec], ((totspec - temp.log_obj)/temp.log_obj)[temp.goodpix_spec], 'ko', ms=2.0, alpha=1.0, mec='None', mfc='black')
+               ax3.plot(10**temp.log_wl[~temp.goodpix_spec], ((totspec - temp.log_obj)/temp.log_obj)[~temp.goodpix_spec], 'o', ms=2.0, alpha=1.0, mec='None', mfc='darkgrey', color='darkgrey')
+               
+               ax3.fill_between(10**temp.log_wl, (-1*(np.exp(meds[5])*temp.log_noise)), ((np.exp(meds[5])*temp.log_noise)), color='lightgrey')
+               
+               ax3_range = np.abs(np.percentile(((totspec - temp.log_obj)/temp.log_obj)[temp.goodpix_spec],[5,95]))
+               ax3.axis([4650/(1+zupd),9200/(1+zupd),-1*np.max(ax3_range), +1*np.max(ax3_range)])
+            
+               #Test inset
+               #ax6 = fig.add_axes([0.81,0.67,0.15,0.12])
+               #inwrange = ((10**temp.log_wl)>3680) & ((10**temp.log_wl)<4100)
+            
+               #ax6.axis([3680,4100,0.9*np.min((totspec*temp.spec_norm)[inwrange]), 1.1*np.max((totspec*temp.spec_norm)[inwrange])])
+               #ax6.plot(10**temp.log_wl[inwrange], 0.01*(totspec*temp.spec_norm)[inwrange], '-', alpha=1.0, color='firebrick', lw=1.0, zorder=1.1)
+               #ax6.plot(10**temp.log_wl[inwrange], 0.01*(temp.log_obj*temp.spec_norm)[inwrange], '-', alpha=1.0, color='black', lw=1.0, zorder=1.05)
+            
+            
+               #Calculate spec chiquare
+               spec_chisq = np.nansum((((totspec - temp.log_obj)/(np.exp(meds[5])*temp.log_noise))[temp.goodpix_spec])**2)
+               spec_chisq /= (temp.goodpix_spec).sum()
+            
+               print('  Reduced Spec Chi square: {0:7.3f}'.format(spec_chisq))
+            
+            else:
+               spec_chisq = -1
+            
+            #Set number and index of random samples
+            nsamp = 100
+            rsamples = np.random.randint(values.shape[0], size=nsamp)
+                            
+            for ii in rsamples:
+                tsamp = values[ii,:-1]
+                tflux, tphot = temp.reconstruct_phot(tsamp, ndim)
+                
+                ax1.plot(temp.red_wl/1e4, tphot*temp.fscale*temp.red_wl*temp.lum_corr/temp.lsun, color='firebrick', alpha=0.1, lw=0.6, rasterized=False)
+                ax1.plot(temp.red_wl/1e4, temp.dusty_phot_young*10**tsamp[8]*temp.fscale*temp.red_wl*temp.lum_corr/temp.lsun, color='blue', alpha=0.1, lw=0.6, rasterized=False)
+                ax1.plot(temp.red_wl/1e4, temp.dusty_phot_old*  10**tsamp[8]*temp.fscale*temp.red_wl*temp.lum_corr/temp.lsun, color='red' , alpha=0.1, lw=0.6, rasterized=False)
+                
+                #Make this array in Myr
+                if temp.timeunit =='Myr':
+                   age_array = np.arange(int(tsamp[1]))
+                elif temp.timeunit =='Gyr':   
+                   age_array = np.arange(int(tsamp[1])*1000)/1000.
+                else:
+                   print('{Time unit {} not implemented yet.}'.format(temp.timeunit))
+                ax4.plot(age_array, sfh.expsfh(age_array,tsamp[0])*10**(tsamp[8]),color='black', alpha=0.1, lw=0.6, rasterized=False)
+                                  
+            
+            #Datapoints on photometry
+            ax1.errorbar(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.lum_corr/temp.lsun, yerr=temp.eflux_obs*temp.pivot_wl*temp.lum_corr/temp.lsun, fmt='none', capsize=3, zorder=30, ecolor='black')
+            ax1.plot(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.lum_corr/temp.lsun, 'ko', ms=6.0)
+          
+            ax1.axis([2e-1,1e2,1e6,2e11])
+            ax1.set_xlabel(r'$\lambda~\mathrm{obs.}~[\mu \mathrm{m}]$')
+            ax1.set_ylabel(r'$\lambda~L_\lambda [L_\odot]$')
+            
+            ax4.set_xlabel(r'$\mathrm{{Time~[{}]}}$'.format(temp.timeunit))
+            ax4.set_ylabel(r'$SFR~\mathrm{[M_\odot~yr^{-1}]}$')
+                    
+            #Plot Tquench Tauquench covariance plot
+            triangle.hist2d(values[:,1], values[:,0], ax=ax5)
+            ax5.axvline(meds[1], color='firebrick', lw=1)
+            ax5.axhline(meds[0], color='firebrick', lw=1)
+            ax5.set_xlabel(r'$\mathrm{{Age~[{}]}}$'.format(temp.timeunit))
+            ax5.set_ylabel(r'$\tau$ [{}]'.format(temp.timeunit))
+             
+            pl.savefig(plotdir+'id{0}_mudf_summary.pdf'.format(obj), bbox_inches='tight')
+            
+            #Now deal with the fit file
+            regstr = '{}'.format((str(obj)).ljust(7))
+            for i in range(ndim): 
+               regstr += '{:8.3f} {:8.3f} {:8.3f} '.format(percs[i,0], percs[i,1], percs[i,2])
+            regstr += '{:8.3f} {:8.3f} {:8.3f} {:8.3f} {:8.3f} {:8.3f} {:8.3f}'.format(medlsfr, perclsfr[1], perclsfr[2], zupd, lnz, spec_chisq, photo_chisq)
+
+            
+            if os.path.isfile(plotdir+fit_file):
+               with open(plotdir+fit_file) as fitfile:
+                 lines = fitfile.readlines()
+               start = [line[:3] for line in lines]
+               try:
+                 pos = start.index(str(obj).ljust(3))
+                 lines[pos] = regstr+'\n'
+               except ValueError:
+                 lines.append(regstr+'\n')
+               with open(plotdir+fit_file, 'w') as fitfile:   
+                  fitfile.writelines(sorted(lines))
+                 
+            else:
+               header = '#ID '
+               for i in range(ndim):
+                 header += '{}_16 {}_50 {}_84 '.format(parameters[i].upper(), parameters[i].upper(),parameters[i].upper())
+               header += 'LSFR_16 LSFR_50 LSFR_84 ZSPS LNZ CHI2_SPEC CHI2_PHOT'
+                 
+               with open(plotdir+fit_file,"w") as fitfile:
+                 fitfile.write(header+'\n')
+                 fitfile.write(regstr+'\n')
+
+            
+
