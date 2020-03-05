@@ -22,7 +22,7 @@ def expsfh(time, tau):
     intsfh = sfh.sum() * 1E6
     return sfh/intsfh
 
-def ssfr(time, tau, sfh):
+def ssfr(time, tau, sfh, avgtime=10):
 
     _tau = np.copy(tau)
     _time = np.copy(time)
@@ -36,4 +36,4 @@ def ssfr(time, tau, sfh):
     timearr = np.arange(int(_time))
     sfharr  = sfh(timearr, tau)
     
-    return sfharr[-1]
+    return np.average(sfharr[-int(avgtime):])

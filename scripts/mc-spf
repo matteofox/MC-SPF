@@ -31,7 +31,7 @@ parser.add_argument('mode',     help='Please select the run mode: FIT, FITPHOT, 
 parser.add_argument('--objlist', default= None,  help='String with the IDs of the objects to fit separated by a space')
 parser.add_argument('--nlive',   default= 500,   help='Number of live points in the Multinest solver, default=500')
 parser.add_argument('--sampeff', default= 0.7,   help='Sampling efficiency in the Multinest solver. Lower is more precise and computationally expensive, default=0.7')
-parser.add_argument('--sfh',     default= 'exp', help='The form of the SFH, allowed values are exp for exponential and del for delayed tau models , default=exp')
+parser.add_argument('--sfh',     default= 'exp', help='The form of the SFH, allowed values are exp for exponential, del for delayed tau models, or a fits file for custom made sfhs default=exp')
 parser.add_argument('--outdir',  default= './',  help='Full path for the output directory. Default is cwd.')
 parser.add_argument('--fullout', dest='fullout', action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
 
@@ -60,10 +60,16 @@ modeldir = os.path.dirname(sys.modules['mcspf'].__file__)+'/models/'
 #Choose SFH
 if args.sfh =='exp':
    model_file = modeldir+'SPS/Models_exp_bc03hr.fits'
+   sfh_pars = ['TAU', 'AGE']
 elif args.sfh =='del':
    model_file = modeldir+'SPS/Models_del_bc03hr.fits'
+   sfh_pars = ['TAU', 'AGE']
+elif os.path.isfile(args.sfh):
+   model_file = args.sfh
+   tmphdu = fits.open(model_file)
+   sfh_pars = [tmphdu[0].header['PAR1'], tmphdu[0].header['PAR2']]
 else:
-   print("SFH not understood aborting...")
+   print("SFH not understood and is not a valid file. Aborting...")
    exit()
 
 plotdir         = rootdir+'Plots/'
@@ -112,7 +118,13 @@ for ind in range(nobj):
     print("{0}) Fitting obj {1} with z {2:5.4f} ".format(str(ind+1).rjust(4), obj, this_obj_z))
 
     this_obj_flux, this_obj_err, this_obj_bands, this_obj_islim = [], [], [], []
-   
+    
+    if 'dl' in colnames:
+        dl = catalogue['dl'][catind]
+        print('      Using user defined luminosity distance of {} Mpc'.format(dl))
+    else:
+        dl = None    
+    
     for col in colnames:
        #------- INPUT UNITS --------
        #Flux input must be in mJy for all the bands. A few lines 
@@ -149,17 +161,28 @@ for ind in range(nobj):
     print("      Object detected in {} out of {} bands".format(len(this_obj_flux)-np.sum(this_obj_islim), len(this_obj_flux)))
    
     try:
-      spec_file = catalogue['spec_file'][catind]
+      spec_file = (catalogue['spec_file'][catind]).strip()
       print("      Found Spectrum {}".format(spec_file))
     except:
       spec_file = None
       
     try:
-      res_file =  catalogue['res_file'][catind]
+      res_file =  (catalogue['res_file'][catind]).strip()
     except:
       res_file = None
-   
-    parameters = ['tau', 'age', 'Av', 'sigma', 'vel', 'lnf', 'a_ext', 'alpha', 'lmass', 'sigma_gas', 'age_gas', 'ion_gas', 'lyscale']
+    
+    try:
+      cropspec = [catalogue['spec_minw'][catind], catalogue['spec_maxw'][catind]]
+    except:
+      cropspec = [100,20000]
+      
+    try:
+      polymax = int(catalogue['polymax'][catind])
+    except:
+      polymax = 3
+       
+    
+    parameters = [sfh_pars[0].lower(), sfh_pars[1].lower(), 'Av', 'sigma', 'vel', 'lnf', 'a_ext', 'alpha', 'lmass', 'sigma_gas', 'age_gas', 'ion_gas', 'lyscale']
     
     ndim = len(parameters)
             
@@ -171,10 +194,10 @@ for ind in range(nobj):
     if args.mode =='FIT' or args.mode=='FITSPEC' or args.mode == 'FITPHOT':
     
       with sps_spec_fitter(this_obj_z, model_file, this_obj_flux, this_obj_err, \
-               this_obj_bands, this_obj_islim, spec_in=spec_file, \
+               this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                res_in=res_file, filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                Gpriors=Gpriors, priorAext=priorAext, fit_spec=fit_spec, fit_phot=fit_phot, \
-               polymax=3, cosmo=cosmo) as temp:
+               polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, dl=dl) as temp:
     
           pymultinest.run(temp.lnlhood, temp._scale_cube, ndim, sampling_efficiency=args.sampeff, resume=False, \
                    outputfiles_basename=out_fmt.format(obj), verbose=True, multimodal=False, \
@@ -201,9 +224,9 @@ for ind in range(nobj):
         if os.path.exists('{0}post_equal_weights.dat'.format(out_fmt.format(obj))):
     
           with sps_spec_fitter(this_obj_z, model_file, this_obj_flux, this_obj_err, \
-                this_obj_bands, this_obj_islim, spec_in=spec_file, \
+                this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                 filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
-                res_in=res_file, polymax=3, cosmo=cosmo) as temp:
+                res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, dl=dl) as temp:
                             
             a = pymultinest.Analyzer(n_params=ndim, outputfiles_basename=out_fmt.format(obj))
             values = a.get_equal_weighted_posterior()
@@ -282,7 +305,7 @@ for ind in range(nobj):
                clean_spec = temp.cont_spec*temp.spec_norm*0.01 #go from 1e-20 to 1e-18
                
                ax2.plot(10**temp.log_wl, totspec*temp.spec_norm*0.01, '-', alpha=1.0, color='firebrick', lw=1.0, zorder=1.1)
-               ax2.axis([4650/(1+zupd),9200/(1+zupd),clean_spec.min()-0.1*clean_spec.ptp(),clean_spec.max()+0.3*clean_spec.ptp()])
+               ax2.axis([(10**temp.log_wl).min()/(1+zupd),(10**temp.log_wl).max()/(1+zupd),clean_spec.min()-0.1*clean_spec.ptp(),clean_spec.max()+0.3*clean_spec.ptp()])
                
 
                ax2.xaxis.set_major_locator(MultipleLocator(500))
@@ -298,7 +321,7 @@ for ind in range(nobj):
                ax3.fill_between(10**temp.log_wl, (-1*(np.exp(meds[5])*temp.log_noise)), ((np.exp(meds[5])*temp.log_noise)), color='lightgrey')
                
                ax3_range = np.abs(np.percentile(((totspec - temp.log_obj)/temp.log_obj)[temp.goodpix_spec],[5,95]))
-               ax3.axis([4650/(1+zupd),9200/(1+zupd),-1*np.max(ax3_range), +1*np.max(ax3_range)])
+               ax3.axis([(10**temp.log_wl).min()/(1+zupd),(10**temp.log_wl).max()/(1+zupd),-1*np.max(ax3_range), +1*np.max(ax3_range)])
             
                #Test inset
                #ax6 = fig.add_axes([0.81,0.67,0.15,0.12])
@@ -344,7 +367,7 @@ for ind in range(nobj):
             ax1.errorbar(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.lum_corr/temp.lsun, yerr=temp.eflux_obs*temp.pivot_wl*temp.lum_corr/temp.lsun, fmt='none', capsize=3, zorder=30, ecolor='black')
             ax1.plot(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.lum_corr/temp.lsun, 'ko', ms=6.0)
           
-            ax1.axis([2e-1,1e2,1e6,2e11])
+            ax1.axis([0.8*np.min(temp.pivot_wl/1e4),1.2*np.nanmax(temp.pivot_wl/1e4),1e6,2e11])
             ax1.set_xlabel(r'$\lambda~\mathrm{obs.}~[\mu \mathrm{m}]$')
             ax1.set_ylabel(r'$\lambda~L_\lambda [L_\odot]$')
             

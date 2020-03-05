@@ -56,8 +56,9 @@ def redir_stdout(to=os.devnull):
 class sps_spec_fitter:
 
     def __init__(self, redshift, phot_mod_file, flux_obs, eflux_obs, filter_list, lim_obs, \
-            crop=[900,9000], spec_in=None, res_in=None, polymax=20, fit_spec=True, fit_phot=True,
-            priorAext=None, fesc=0., Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None):
+            cropspec=[100,20000], spec_in=None, res_in=None, polymax=20, fit_spec=True, fit_phot=True,
+            priorAext=None, fesc=0., Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None,
+            sfh_pars=['TAU','AGE']):
         
         """ Class for dealing with MultiNest fitting """
         
@@ -126,9 +127,13 @@ class sps_spec_fitter:
         ext_tau, ext_age, ext_metal = [],[],[]
         for ii in range(1,num_ext):
             if ii==1:
-             self.timeunit = mfile[ii].header['AGEUNIT']
-            age   = mfile[ii].header['AGE'] 
-            tau   = mfile[ii].header['TAU'] 
+             try:
+                self.timeunit = mfile[ii].header['AGEUNIT']
+             except:
+                self.timeunit = 'Myr'
+                print('AGEUNIT keyword not found. Using Myr')
+            tau   = mfile[ii].header[sfh_pars[0]] 
+            age   = mfile[ii].header[sfh_pars[1]] 
             ext_tau.append(np.float(tau))
             ext_age.append(np.float(age))
 
@@ -155,8 +160,8 @@ class sps_spec_fitter:
             mdata  = np.array(mfile[ii].data,  dtype=np.float)
             mmass  = mfile[ii].header['MSTAR']
             mmetal = mfile[ii].header['METAL']
-            mage   = mfile[ii].header['AGE'] 
-            mtau   = mfile[ii].header['TAU'] 
+            mtau   = mfile[ii].header[sfh_pars[0]] 
+            mage   = mfile[ii].header[sfh_pars[1]] 
             
             tau_idx = np.where(mtau == self.grid_tau)[0]
             age_idx = np.where(mage == self.grid_age)[0]
@@ -268,9 +273,9 @@ class sps_spec_fitter:
             
             #so it can be used in the fit           
             file = fits.open(self.spec_in)
-            obj = np.asarray(file[0].data, dtype=float)
+            obj       = np.asarray(file[0].data, dtype=float)
             obj_noise = np.asarray(file[1].data, dtype=float)
-            wl_obj = np.asarray(file[2].data, dtype=float)
+            wl_obj    = np.asarray(file[2].data, dtype=float)
                     
             #open up resolution file
             rfile = fits.open(self.res_in)
@@ -281,15 +286,17 @@ class sps_spec_fitter:
             self.lsf_wl = ((np.arange(size, dtype=np.float)+1 - crpix)*cdelt + crval)
             rfile.close()
 
-            #clip off the bad ends of the spectrum
+            #clip off the spectrum as requested by the user
+            range_crop = (wl_obj > cropspec[0]) & (wl_obj < cropspec[1])
             rest_wl = wl_obj/(1.+self.redshift) 
-            range_crop = (rest_wl > crop[0]) & (rest_wl < crop[1])
+            
             self.wl_obj = rest_wl[range_crop]
+            self.obj = obj[range_crop]
+            self.obj_noise = obj_noise[range_crop]
+            
             self.dlam_lin = np.diff(self.wl_obj)[0]
             self.npix_obj = len(self.wl_obj)
 
-            self.obj = obj[range_crop]
-            self.obj_noise = obj_noise[range_crop]
             
             #rebin the object to log
             self.log_wl, self.dlam_log = np.linspace(np.log10(self.wl_obj[0]), np.log10(self.wl_obj[-1]), self.npix_obj, retstep=True)
@@ -330,7 +337,7 @@ class sps_spec_fitter:
             self.log_noise = self.log_noise/self.spec_norm
 
             #Now work through the models
-            self.use_wl = (self.wl > 900) & (self.wl < crop[1]+100)
+            self.use_wl = (self.wl > 900) & (self.wl < cropspec[1]+100)
             self.model_spec_wl = self.wl[self.use_wl]
 
             #rescale the model spectra and crop down wavelength
@@ -409,11 +416,14 @@ class sps_spec_fitter:
         
         #set up parameter limits
         self.tau_lims = np.array((self.grid_tau.min(), self.grid_tau.max()))
-        self.age_lims = np.array((self.grid_age.min(), self.gal_age)) #self.grid_age.max()))
+        if sfh_pars[1]=='AGE':
+          self.age_lims = np.array((self.grid_age.min(), self.gal_age)) #self.grid_age.max()))
+        else:
+          self.age_lims = np.array((self.grid_age.min(), self.grid_age.max()))
         self.av_lims = np.array((0., 4.))
         self.sig_lims = np.array((10., 500.))
         self.vel_lims = np.array((-250., 250.))
-        self.lnf_lims = np.array((-0.5, 1))
+        self.lnf_lims = np.array((-0.5, 1.5))
         self.ext_lims = np.array((0, 4.))
         self.alpha_lims = np.array((self.dh_alpha[0], self.dh_alpha[-1]))
         self.mass_lims = np.array((3,12))
