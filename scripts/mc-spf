@@ -33,6 +33,7 @@ parser.add_argument('--nlive',   default= 500,   help='Number of live points in 
 parser.add_argument('--sampeff', default= 0.7,   help='Sampling efficiency in the Multinest solver. Lower is more precise and computationally expensive, default=0.7')
 parser.add_argument('--sfh',     default= 'exp', help='The form of the SFH, allowed values are exp for exponential, del for delayed tau models, or a fits file for custom made sfhs default=exp')
 parser.add_argument('--outdir',  default= './',  help='Full path for the output directory. Default is cwd.')
+parser.add_argument('--funit',   default='mJy',  help='Thescribes the flux unit of the input photometry, values allowed: mJy, uJy, nJy')
 parser.add_argument('--fullout', dest='fullout', action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
 
 args = parser.parse_args()
@@ -99,8 +100,13 @@ else:
 ffilt = np.loadtxt(args.filtfile, dtype=object) 
 fsps_filt = dict(zip(ffilt[:,0], ffilt[:,1]))
 
-#Resolution file
-res_file = rootdir+'Extracted_resolution_muse.fits'
+#Scale flux units
+if args.funit == 'mJy':
+   fuscale = 1.
+elif args.funit == 'uJy':    
+   fuscale = 1E-3
+elif args.funit == 'nJy':    
+   fuscale = 1E-6
 
 print("Fitting {} objects".format(nobj))
 print("Model file {0} ".format(os.path.basename(model_file)))
@@ -127,7 +133,7 @@ for ind in range(nobj):
     
     for col in colnames:
        #------- INPUT UNITS --------
-       #Flux input must be in mJy for all the bands. A few lines 
+       #Flux input must be in xJy for all the bands. A few lines 
        #below it is converted into erg s^-1 cm^-2 Hz^-1 = 1E-26 mJy
        #----------------------------
        #Is this a flux column?
@@ -143,12 +149,12 @@ for ind in range(nobj):
            
            SNR = flux/errf
            if SNR>2:
-             this_obj_flux.append(flux * 1E-26)
-             this_obj_err.append(errf * 1E-26)
+             this_obj_flux.append(flux * fuscale* 1E-26)
+             this_obj_err.append(errf * fuscale* 1E-26)
              this_obj_islim.append(0)
            else:
              this_obj_flux.append(0.)
-             this_obj_err.append(errf * 1E-26)
+             this_obj_err.append(errf * fuscale* 1E-26)
              this_obj_islim.append(1)
            
            this_obj_bands.append(fsps_filt[photband])
@@ -305,8 +311,7 @@ for ind in range(nobj):
                clean_spec = temp.cont_spec*temp.spec_norm*0.01 #go from 1e-20 to 1e-18
                
                ax2.plot(10**temp.log_wl, totspec*temp.spec_norm*0.01, '-', alpha=1.0, color='firebrick', lw=1.0, zorder=1.1)
-               ax2.axis([(10**temp.log_wl).min()/(1+zupd),(10**temp.log_wl).max()/(1+zupd),clean_spec.min()-0.1*clean_spec.ptp(),clean_spec.max()+0.3*clean_spec.ptp()])
-               
+               ax2.axis([(10**temp.log_wl).min(),(10**temp.log_wl).max(),clean_spec.min()-0.1*clean_spec.ptp(),clean_spec.max()+0.3*clean_spec.ptp()])               
 
                ax2.xaxis.set_major_locator(MultipleLocator(500))
                ax2.xaxis.set_minor_locator(MultipleLocator(100))
@@ -321,7 +326,7 @@ for ind in range(nobj):
                ax3.fill_between(10**temp.log_wl, (-1*(np.exp(meds[5])*temp.log_noise)), ((np.exp(meds[5])*temp.log_noise)), color='lightgrey')
                
                ax3_range = np.abs(np.percentile(((totspec - temp.log_obj)/temp.log_obj)[temp.goodpix_spec],[5,95]))
-               ax3.axis([(10**temp.log_wl).min()/(1+zupd),(10**temp.log_wl).max()/(1+zupd),-1*np.max(ax3_range), +1*np.max(ax3_range)])
+               ax3.axis([(10**temp.log_wl).min(),(10**temp.log_wl).max(),-1*np.max(ax3_range), +1*np.max(ax3_range)])
             
                #Test inset
                #ax6 = fig.add_axes([0.81,0.67,0.15,0.12])
