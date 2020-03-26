@@ -9,6 +9,7 @@ import astropy.io.fits as fits
 from scipy.interpolate import RectBivariateSpline as rect
 from bisect import bisect_left
 import astropy.units as u
+import astropy.stats as stats
 import sys
 from contextlib import contextmanager
 
@@ -19,6 +20,8 @@ import numpy.polynomial as poly
 from ..utils.magtools  import getmag_spec
 from ..utils.readfilt  import init_filters, get_filter
 from ..utils.sincrebin import sincrebin_single_os as sincrebin
+
+import matplotlib.pyplot as mp
 
 warnings.filterwarnings("ignore")
 
@@ -56,8 +59,8 @@ def redir_stdout(to=os.devnull):
 class sps_spec_fitter:
 
     def __init__(self, redshift, phot_mod_file, flux_obs, eflux_obs, filter_list, lim_obs, \
-            cropspec=[100,20000], spec_in=None, res_in=None, polymax=20, fit_spec=True, fit_phot=True,
-            priorAext=None, fesc=0., Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None,
+            cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20], fit_spec=True, fit_phot=True,
+            priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None,
             sfh_pars=['TAU','AGE']):
         
         """ Class for dealing with MultiNest fitting """
@@ -82,6 +85,8 @@ class sps_spec_fitter:
         self.spec_in = spec_in
         self.res_in = res_in
         self.priorAext = priorAext 
+        self.cropspec = cropspec
+        self.polymax = polymax
         
         #constants
         self.small_num = 1e-70
@@ -98,7 +103,7 @@ class sps_spec_fitter:
         
         self.mag2cgs = np.log10(self.lsun/4.0/np.pi/(self.pc2cm*self.pc2cm)/100.)
         self.dist = 4.0*np.pi*(self.pc2cm*self.pc2cm)*100.
-        self.lum_corr = (self.Mpc_to_cm*dl)**2*4.*np.pi #4pi*dl^2 in cm^2
+        self.flux_to_lum = (self.Mpc_to_cm*dl)**2*4.*np.pi #4pi*dl^2 in cm^2
         
         #some derived parameters
         self.gal_age = cosmo.age(self.redshift).value #In Gyr here, will be modified later if necessary
@@ -121,6 +126,7 @@ class sps_spec_fitter:
         #expand wavelength grid to include range covered by DH templates
         dh_long = (dh_wl > twl.max())
         self.wl = np.r_[twl, dh_wl[dh_long]]
+        self.red_wl = self.wl * (1.+self.redshift)
         self.n_wl = len(self.wl)
         
         #Done with wavelength, now pass through extensions to get grid parameters
@@ -147,8 +153,7 @@ class sps_spec_fitter:
         self.n_tau = len(self.grid_tau)
         self.n_age = len(self.grid_age)
         
-        #tau_id = dict(zip(self.grid_tau, range(self.n_tau)))
-        #age_id = dict(zip(self.grid_age, range(self.n_age)))
+        self.mod_flux_to_lum = 1.196495E40
         
         #output grid
         self.mod_grid = np.zeros((self.n_tau, self.n_age, self.n_wl), dtype=np.float)
@@ -171,27 +176,26 @@ class sps_spec_fitter:
 
         mfile.close() 
 
-        #some information on the BC03 spectral resolution (in the optical)
+        #some information on the BC03 spectral resolution (FWHM is 3A in the optical)
         self.sps_res_val = np.copy(self.wl)/300.
         self.sps_res_val[(self.wl >= 3200) & (self.wl <= 9500)] = 3.
         
         self.mod_grid[~np.isfinite(self.mod_grid)] = 0.
         self.fym_grid[~np.isfinite(self.fym_grid)] = 0.
 
-        #pre-compute attenuation curve
+        #pre-compute attenuation curve for photometry
         self.k_cal = self._make_dusty(self.wl)
         
         #redshift the grid to be used in deriving predicted fluxes, also apply
         #flux correction to conserve energy
-        self._redshift_spec()
+        #self._redshift_spec()
         
         ### for nebular emission ###
         self.wl_lyman = 912.
         self.ilyman = np.searchsorted(self.wl, self.wl_lyman, side='left') #wavelength just above Lyman limit
         self.lycont_wls = np.r_[self.wl[:self.ilyman], np.array([self.wl_lyman])]
-        self.clyman_young = [None, None] #A list of two elements, first is for phot, the other for spec
-        self.clyman_old   = [None, None] #A list of two elements, first is for phot, the other for spec
-        self.fesc = fesc                 #lyman continuum escape fraction
+        self.clyman_young = None #A list of two elements, first is for phot, the other for spec
+        self.clyman_old   = None #A list of two elements, first is for phot, the other for spec
 
         self.emm_scales = np.zeros((7,10,128), dtype=np.float)
         self.emm_wls    = np.zeros(128,        dtype=np.float)
@@ -210,7 +214,7 @@ class sps_spec_fitter:
                         iline = 1
                     else:
                         if rline: #Read line fluxes
-                            self.emm_scales[icnt%7,icnt//7,:] = np.array(temp, dtype=np.float)
+                            self.emm_scales[icnt%7,icnt//7,:] = np.array(temp, dtype=np.float)*self.lsun #output should be in erg/s/QHO
                             icnt += 1
                         if len(temp) == 3 and float(temp[0]) == 0.0:
                             rline = 1
@@ -219,16 +223,17 @@ class sps_spec_fitter:
                         else:
                             rline = 0
         
-        thb = (self.emm_wls > 4860) & (self.emm_wls < 4864)
-        tha = (self.emm_wls > 6560) & (self.emm_wls < 6565)
-        self.emm_scales = np.copy(self.emm_scales) / self.emm_scales[:,:,thb]
-        
-        mscale     = np.max(self.emm_scales, axis=(0,1))
-        keep_scale = (mscale > 0.025) & (self.emm_wls<1E5)
+        #thb = (self.emm_wls > 4860) & (self.emm_wls < 4864)
+        #tha = (self.emm_wls > 6560) & (self.emm_wls < 6565)
+        #self.emm_scales = np.copy(self.emm_scales) / self.emm_scales[:,:,thb]
+                
+        #mscale     = np.max(self.emm_scales, axis=(0,1))
+        #keep_scale = (mscale > 0.025) & (self.emm_wls<1E5)
+        keep_scale = (self.emm_wls<1E5)
                 
         self.emm_scales = self.emm_scales[:,:,keep_scale]
         self.emm_wls    = self.emm_wls[keep_scale]
-        
+                
         #generate pattern arrays for nebular emission lines
         dpix = np.diff(self.wl)
         self.wl_edges  = np.r_[np.array([self.wl[0]-dpix[0]/2.]), np.r_[self.wl[1:]-dpix/2., np.array([self.wl[-1]+dpix[-1]/2.])]]
@@ -267,151 +272,44 @@ class sps_spec_fitter:
         self.flux_obs = flux_obs * self.clight/self.pivot_wl**2
         self.eflux_obs = eflux_obs * self.clight/self.pivot_wl**2
         self.lim_obs = lim_obs
-
-        #if an input spectrum is provided, do additional processes
-        if spec_in is not None:
-            
-            #so it can be used in the fit           
-            file = fits.open(self.spec_in)
-            obj       = np.asarray(file[0].data, dtype=float)
-            obj_noise = np.asarray(file[1].data, dtype=float)
-            wl_obj    = np.asarray(file[2].data, dtype=float)
-                    
-            #open up resolution file
-            rfile = fits.open(self.res_in)
-            rhdr = rfile[0].header
-            
-            self.lsf_res = np.asarray(rfile[0].data, dtype=np.float) * 2.
-            crval, cdelt, crpix, size = rhdr['CRVAL1'], rhdr['CD1_1'], 1., rhdr['NAXIS1']
-            self.lsf_wl = ((np.arange(size, dtype=np.float)+1 - crpix)*cdelt + crval)
-            rfile.close()
-
-            #clip off the spectrum as requested by the user
-            range_crop = (wl_obj > cropspec[0]) & (wl_obj < cropspec[1])
-            rest_wl = wl_obj/(1.+self.redshift) 
-            
-            self.wl_obj = rest_wl[range_crop]
-            self.obj = obj[range_crop]
-            self.obj_noise = obj_noise[range_crop]
-            
-            self.dlam_lin = np.diff(self.wl_obj)[0]
-            self.npix_obj = len(self.wl_obj)
-
-            
-            #rebin the object to log
-            self.log_wl, self.dlam_log = np.linspace(np.log10(self.wl_obj[0]), np.log10(self.wl_obj[-1]), self.npix_obj, retstep=True)
-            self.log_wl_edges = np.r_[self.log_wl-self.dlam_log/2., self.log_wl[-1:]+self.dlam_log/2.]
-
-            mask = np.isfinite(self.obj) & np.isfinite(self.obj_noise) & (self.obj_noise > 0)
-            self.log_obj = sincrebin(10**self.log_wl, self.wl_obj[mask], self.obj[mask])
-            self.log_noise = np.sqrt(sincrebin(10**self.log_wl, self.wl_obj[mask], self.obj_noise[mask]**2))
-           
-            #masking to remove bad pixels etc.
-            self.goodpix_gen = np.isfinite(self.log_obj) & (self.log_noise > 0) & np.isfinite(self.log_noise)
-            self.n_good = np.count_nonzero(self.goodpix_gen)
-
-            #include masking of 5577 sky line
-            sky_mask = (self.log_wl+np.log10(1.+self.redshift) > np.log10(5567.)) & (self.log_wl+np.log10(1.+self.redshift) < np.log10(5587.))
-            self.goodpix_gen[sky_mask] = False
-            
-            #AO mask if in A0 mode
-            if (obj[(wl_obj>5800) & (wl_obj<5900)]).sum() ==0:
-               ao_lims = wl_obj[obj==0]
-               ao_mask = (self.log_wl+np.log10(1.+self.redshift) > np.log10(ao_lims[0])) & (self.log_wl+np.log10(1.+self.redshift) < np.log10(ao_lims[-1]))
-               self.goodpix_gen[ao_mask] = False
-               
-            self.goodpix_spec = np.copy(self.goodpix_gen)
-            
-            #pl.plot(self.log_wl, self.log_obj, 'k-')
-            #pl.plot(self.log_wl[~self.goodpix_spec], self.log_obj[~self.goodpix_spec], 'ro', mec='red', ms=3.0)
-            #pl.show()
-            
-            #normalize the object and variance arrays
-            self.norm_window = ((self.log_wl+np.log10(1.+self.redshift) > np.log10(6000)) & (self.log_wl+np.log10(1.+self.redshift) < np.log10(6200)))
-            
-            #normalize the observed spectrum
-            self.spec_norm = np.nansum(self.log_obj[self.norm_window]/self.log_noise[self.norm_window]**2)/\
-                    np.nansum(1./self.log_noise[self.norm_window]**2)
-            
-            self.log_obj = self.log_obj/self.spec_norm
-            self.log_noise = self.log_noise/self.spec_norm
-
-            #Now work through the models
-            self.use_wl = (self.wl > 900) & (self.wl < cropspec[1]+100)
-            self.model_spec_wl = self.wl[self.use_wl]
-
-            #rescale the model spectra and crop down wavelength
-            self.model_spec_grid = self.red_mod_grid[:,:,self.use_wl]
-            self.model_fysp_grid = self.fym_grid[:,:,self.use_wl]
-
-            self.n_wl_crop = np.count_nonzero(self.use_wl)
-            self.n_model_spec = self.n_tau * self.n_age
-
-            self.log_model_wl = np.arange(np.log10(self.model_spec_wl[0]), \
-                    np.log10(self.model_spec_wl[-1])+self.dlam_log/2., self.dlam_log)
-            self.log_model_wl_edges = np.r_[self.log_model_wl-self.dlam_log/2., self.log_model_wl[-1:]+self.dlam_log/2.]
-            self.n_model_wl = len(self.log_model_wl)
-            self.spec_k_cal = self._make_dusty(10**self.log_model_wl)
-
-            self.npad = 2**int(np.ceil(np.log2(self.n_model_wl)))
-
-            #mask pixels outside the template range
-            self.goodpix_spec[self.log_wl < min(self.log_model_wl)] = 0
-            self.goodpix_spec[self.log_wl > max(self.log_model_wl)] = 0
-
-            #spectral resolutions
-            sps_res = np.interp(10**self.log_model_wl, self.wl, self.sps_res_val)
-            obs_res = 10**self.log_model_wl / np.interp(10**self.log_model_wl, self.lsf_wl, self.lsf_res)
-
-            model_dlam = np.nanmedian(np.diff(self.model_spec_wl))
-
-            a2kms = self.clight/1e13/10**self.log_model_wl
-            self.kms2pix = np.log(10)*self.clight*self.dlam_log/1e13
-
-            sps_kms = sps_res*a2kms/2.355
-            self.obs_kms = obs_res*a2kms/2.355
-            res_diff = np.sqrt(self.obs_kms**2 - sps_kms**2) #observations lower resolution
-
-            self.kernel_kms = np.copy(res_diff)
-            kernel_pix = self.kernel_kms/self.kms2pix
-            
-            #set up storage for log models
-            self.log_spec_grid = np.zeros((self.n_tau, self.n_age, self.n_model_wl), dtype=np.float)
-            self.log_fysp_grid = np.zeros((self.n_tau, self.n_age, self.n_model_wl), dtype=np.float)
-            
-            cnt = 0
-            for jj in range(self.n_tau):
-                for kk in range(self.n_age):
-                     this_templ = self.model_spec_grid[jj,kk,:]
-                     this_young = self.model_fysp_grid[jj,kk,:] * np.copy(this_templ)
-                     log_spec = np.interp(10**self.log_model_wl,  self.model_spec_wl, this_templ)
-                     log_young = np.interp(10**self.log_model_wl, self.model_spec_wl, this_young)
-
-                     self.log_spec_grid[jj,kk,:] = log_spec
-                     self.log_fysp_grid[jj,kk,:] = np.copy(log_young)/np.copy(log_spec)
         
-
-            #cut down emission line arrays for the spectral grid
-            log_emm_use = (self.emm_wls > 10**self.log_model_wl[0]) & (self.emm_wls < 10**self.log_model_wl[-1])
-            self.log_emm_wls = self.emm_wls[log_emm_use]
-            self.log_emm_res = np.interp(np.log10(self.log_emm_wls), self.log_model_wl, self.obs_kms/self.kms2pix/2.) #in pixels
-            self.log_emm_scales = self.emm_scales[:,:,log_emm_use]
+        #if an input spectrum is provided, do additional processes
+        if spec_in[0] is not None:
             
-            self.diff_pix = (self.log_model_wl_edges[None,:] - np.log10(self.log_emm_wls)[:,None])/self.dlam_log #in pixels
-            self.norm_pix = np.sqrt(2.)*self.log_emm_res[:,None]
-      
-            #a few additional steps to set up the fitting
-            self.vsys_pix = (self.log_model_wl[0] - self.log_wl[0])*\
-                   np.log(10)*self.clight/self.kms2pix/1e13
+            self.n_spec = len(spec_in)
+            
+            self.wl_obj       = []
+            self.obj          = []
+            self.obj_noise    = []
+            self.npix_obj     = []
+            self.log_wl       = []
+            self.log_obj      = []
+            self.log_noise    = []
+            self.goodpix_spec = []
+            self.log_model_wl = []
+            self.log_model_wl_edges = []
+            self.n_model_wl         = []
+            self.spec_k_cal         = []
+            self.spec_norm          = []
+            self.npad               = []
+            self.log_spec_grid      = []
+            self.log_fysp_grid      = []
+            self.log_emm_wls    = []
+            self.log_emm_scales = []
+            self.diff_pix       = []
+            self.vsys_pix       = []
+            self.kernel_avg_kms = []
+            self.kms2pix        = []
+            self.poly_deg       = []
+            self.scaled_lambda  = []
+            
 
-            #setup for polynomial normalization
-            low, high = min(self.log_wl), max(self.log_wl)
-            dlam = high-low
-            mlam = (high+low)/2.
-            self.scaled_lambda = (self.log_wl - mlam) * 2/dlam
-            self.dlam_poly = 150.
-            self.poly_max = polymax
-            self.poly_deg = min(int((10**high - 10**low)/self.dlam_poly), self.poly_max)
+            
+            for ind in range(self.n_spec):
+                self.spec_init(self.spec_in[ind], self.res_in[ind], self.polymax[ind])
+
+        else:
+          self.nspec = 0
 
         
         #set up parameter limits
@@ -421,24 +319,169 @@ class sps_spec_fitter:
         else:
           self.age_lims = np.array((self.grid_age.min(), self.grid_age.max()))
         self.av_lims = np.array((0., 4.))
-        self.sig_lims = np.array((10., 500.))
-        self.vel_lims = np.array((-250., 250.))
-        self.lnf_lims = np.array((-0.5, 1.5))
         self.ext_lims = np.array((0, 4.))
         self.alpha_lims = np.array((self.dh_alpha[0], self.dh_alpha[-1]))
         self.mass_lims = np.array((3,12))
-        self.sigg_lims = np.array((1.,200.)) 
+        self.sig_lims = np.array((10., 500.))
+        self.vel_lims = np.array((-250., 250.))
+        self.emmsig_lims = np.array((1.,200.)) 
         self.emmage_lims = np.array((self.emm_ages.min(), 10))
         self.emmion_lims = np.array((self.emm_ions.min(), self.emm_ions.max()))
-        self.lyscale_lims = np.array((0.99, 1.01))
+        self.fesc_lims = np.array((0.00, .90))
+        self.lnf_lims = np.array((-1.5, 1.5))
 
         self.bounds = [self.tau_lims, self.age_lims, self.av_lims, \
-                self.sig_lims, self.vel_lims, self.lnf_lims, self.ext_lims, \
-                self.alpha_lims, self.mass_lims, self.sigg_lims, self.emmage_lims,\
-                self.emmion_lims, self.lyscale_lims]
+                self.ext_lims, self.alpha_lims,  self.mass_lims, \
+                self.sig_lims, self.vel_lims, self.emmsig_lims, self.emmage_lims,\
+                self.emmion_lims, self.fesc_lims, self.lnf_lims, self.lnf_lims]
                 
         self.ndims = len(self.bounds)   
+    
+    def spec_init(self, specfile, resfile, polymax):
 
+        #so it can be used in the fit           
+        file = fits.open(specfile)
+        obj       = np.asarray(file[0].data, dtype=float)
+        obj_noise = np.asarray(file[1].data, dtype=float)
+        wl_obj    = np.asarray(file[2].data, dtype=float)
+                
+        #open up resolution file
+        rfile = fits.open(resfile)
+        rhdr = rfile[0].header
+        
+        lsf_res = np.asarray(rfile[0].data, dtype=np.float) #This is R
+        crval, cdelt, crpix, size = rhdr['CRVAL1'], rhdr['CD1_1'], 1., rhdr['NAXIS1']
+        lsf_wl = ((np.arange(size, dtype=np.float)+1 - crpix)*cdelt + crval)
+        lsf_res = lsf_wl / lsf_res #Now in FWHM in A
+        rfile.close()
+
+        #clip off the spectrum as requested by the user
+        range_crop = (wl_obj > self.cropspec[0]) & (wl_obj < self.cropspec[1])
+        
+        wl_obj = wl_obj[range_crop]
+        obj = obj[range_crop] * 1E-20
+        obj_noise = obj_noise[range_crop] * 1E-20
+        npix_obj = len(wl_obj)
+       
+        #rebin the object to log
+        log_wl, dlam_log = np.linspace(np.log10(wl_obj[0]), np.log10(wl_obj[-1]), npix_obj, retstep=True)
+        
+        log_obj = sincrebin(10**log_wl, wl_obj, obj)
+        log_noise = np.sqrt(sincrebin(10**log_wl, wl_obj, obj_noise**2))
+
+        #mask nans, pixels with zero noise and data euqal to zero
+        goodpix_spec = np.isfinite(log_obj) & np.isfinite(log_noise) & (log_noise>0) & (log_obj!=0)
+                  
+        #pl.plot(log_wl, log_obj, 'k-')
+        #pl.plot(log_wl[~goodpix_spec], self.log_obj[~goodpix_spec], 'ro', mec='red', ms=3.0)
+        #pl.show()
+        
+        #setup for polynomial normalization
+        low_log, high_log = min(log_wl), max(log_wl)
+        slam_log = high_log-low_log
+        mlam_log = (high_log+low_log)/2.
+        
+        low_lin, high_lin = min(wl_obj), max(wl_obj)
+        mlam_lin = (high_lin+low_lin)/2.
+        
+        scaled_lambda = (log_wl - mlam_log) * 2/slam_log
+        poly_deg = min(int((high_lin - low_lin)/150.), polymax)  
+
+        #normalize the observed spectrum
+        #norm_window = ((log_wl > np.log10(mlam_lin-125)) & (log_wl < np.log10(mlam_lin+125)))
+        #spec_norm = np.nansum(log_obj[norm_window]/log_noise[norm_window]**2)/np.nansum(1./log_noise[norm_window]**2)
+        
+        dummy, spec_norm, dummy = stats.sigma_clipped_stats(log_obj)
+        
+        log_obj   = log_obj/spec_norm
+        log_noise = log_noise/spec_norm
+                
+        #Prepare absorption profile (wave must be rest)    
+        spec_k_cal = self._make_dusty((10**log_wl)/(1+self.redshift))
+
+        #Now work through the models
+        use_wl = (self.wl > 900) & (self.wl < 20000)
+        model_spec_wl = self.wl[use_wl] * (1+self.redshift)
+        log_model_wl = np.arange(np.log10(model_spec_wl[0]),np.log10(model_spec_wl[-1])+dlam_log/2., dlam_log)
+        log_model_wl_edges = np.r_[log_model_wl-dlam_log/2., log_model_wl[-1:]+dlam_log/2.]
+        n_model_wl = len(log_model_wl)
+        npad = 2**int(np.ceil(np.log2(n_model_wl)))
+
+        #mask pixels outside the template range
+        goodpix_spec[log_wl < min(log_model_wl)] = 0
+        goodpix_spec[log_wl > max(log_model_wl)] = 0
+
+        #spectral resolutions in FWHM in A, for observations interpolate at rest-frame waves
+        sps_res = np.interp(10**log_wl, self.red_wl, self.sps_res_val) 
+        obs_res = np.interp(10**log_wl, lsf_wl, lsf_res)
+                
+        kms2pix = np.log(10)*self.clight*dlam_log/1e13
+
+        sps_kms = (sps_res/2.355)*(self.clight/1e13)/((10**log_wl)/(1+self.redshift))
+        obs_kms = (obs_res/2.355)*(self.clight/1e13)/((10**log_wl)) #Wave here has to be obs frame
+        kernel_kms = np.sqrt(obs_kms**2 - sps_kms**2) #observations lower resolution
+        kernel_avg_kms = np.nanmedian(kernel_kms)
+        if not np.isfinite(kernel_avg_kms):
+           kernel_avg_kms = 0.
+           
+        #fig, ax = mp.subplots()
+        #ax.plot(10**log_wl, sps_kms, '-k')
+        #ax.plot(10**log_wl, obs_kms, '-r')
+        #mp.show()
+                
+        #set up storage for log models
+        log_spec_grid = np.zeros((self.n_tau, self.n_age, n_model_wl), dtype=np.float)
+        log_fysp_grid = np.zeros((self.n_tau, self.n_age, n_model_wl), dtype=np.float)
+        
+        cnt = 0
+        for jj in range(self.n_tau):
+            for kk in range(self.n_age):
+                 this_templ = self.mod_grid[jj,kk,use_wl]  
+                 this_young = self.fym_grid[jj,kk,use_wl] * np.copy(this_templ)
+                 log_spec  = np.interp(10**log_model_wl,  model_spec_wl, this_templ)
+                 log_young = np.interp(10**log_model_wl,  model_spec_wl, this_young)
+
+                 log_spec_grid[jj,kk,:] = log_spec
+                 log_fysp_grid[jj,kk,:] = np.copy(log_young)/np.copy(log_spec)
+        
+
+        #cut down emission line arrays for the spectral grid
+        log_emm_use = (self.emm_wls*(1+self.redshift) > 10**log_model_wl[0]) & (self.emm_wls*(1+self.redshift) < 10**log_model_wl[-1])
+        log_emm_wls = self.emm_wls[log_emm_use] *(1+self.redshift)
+        log_emm_scales = self.emm_scales[:,:,log_emm_use]
+        
+        #tha = np.where((log_emm_wls/(1+self.redshift) > 6560) & (log_emm_wls/(1+self.redshift) < 6565))
+        #thb = np.where((log_emm_wls/(1+self.redshift) > 4858) & (log_emm_wls/(1+self.redshift) < 4864))
+        
+        diff_pix = (log_model_wl_edges[None,:] - np.log10(log_emm_wls)[:,None])/dlam_log #in pixels
+        vsys_pix = (log_model_wl[0] - log_wl[0])*np.log(10)*self.clight/kms2pix/1e13
+        
+        #Add relevant values to arrays
+        self.wl_obj.append(wl_obj)
+        self.obj.append(obj)
+        self.obj_noise.append(obj_noise)
+        self.npix_obj.append(npix_obj)
+        self.log_wl.append(log_wl)
+        self.log_obj.append(log_obj)
+        self.log_noise.append(log_noise) 
+        self.goodpix_spec.append(goodpix_spec) 
+        self.log_model_wl.append(log_model_wl)
+        self.log_model_wl_edges.append(log_model_wl_edges)
+        self.n_model_wl.append(n_model_wl)
+        self.spec_norm.append(spec_norm)
+        self.spec_k_cal.append(spec_k_cal)
+        self.npad.append(npad)
+        self.poly_deg.append(poly_deg)
+        self.kms2pix.append(kms2pix)
+        self.kernel_avg_kms.append(kernel_avg_kms)
+        self.log_spec_grid.append(log_spec_grid)
+        self.log_fysp_grid.append(log_fysp_grid)
+        self.log_emm_wls.append(log_emm_wls)
+        self.log_emm_scales.append(log_emm_scales)
+        self.scaled_lambda.append(scaled_lambda)
+        self.diff_pix.append(diff_pix)
+        self.vsys_pix.append(vsys_pix)
+    
     def vactoair(self, linLam):
         """Convert vacuum wavelengths to air wavelengths using the conversion
         given by Morton (1991, ApJS, 77, 119).
@@ -467,26 +510,13 @@ class sps_spec_fitter:
 
         return
 
-    def _losvd(self, vel, sigma):
-        """generate broadening kernel given values in km/s
-        """
-        vel_pix = vel/self.kms2pix
-        sigma_pix = sigma/self.kms2pix
-        dw = int(np.ceil(np.fabs(self.vsys_pix) + np.fabs(vel_pix) + 6.*sigma_pix)) #sample to 6 sigma
-        npix = 2*dw + 1 # total number of pixels to fully sample the losvd
-        pix = np.linspace(-dw-0.5, dw+0.5, npix+1, endpoint=True) # pixel edges
-
-        y = (pix - vel_pix - self.vsys_pix)/sigma_pix/np.sqrt(2)
-        losvd = np.diff(0.5*(1.+erf(y)))
-        return losvd, npix
-
-    def _losvd_rfft(self, vel, sigma):
+    def _losvd_rfft(self, vel, sigma, spid):
         """Generate analytic fourier transform of the LOSVD following Cappellari et al. 2016 and pPXF,
         simplified for purposes here"""
-        nl = self.npad//2 + 1
+        nl = self.npad[spid]//2 + 1
         losvd_rfft = np.zeros(nl, dtype=np.complex)
-        vel_pix = vel/self.kms2pix + self.vsys_pix
-        sigma_pix = sigma/self.kms2pix
+        vel_pix = vel/self.kms2pix[spid] + self.vsys_pix[spid]
+        sigma_pix = np.sqrt(sigma**2+self.kernel_avg_kms[spid]**2)/self.kms2pix[spid]
 
         #compute the FFT
         a = vel_pix / sigma_pix
@@ -495,27 +525,18 @@ class sps_spec_fitter:
 
         return np.conj(losvd_rfft)
 
-    def _vel_convolve_fft(self, spec, sigma, vel):
+    def _vel_convolve_fft(self, spec, sigma, vel, spid):
         
         #convolve input spectrum to given velocity
         #generate kernel (in pixels)
-        fft_losvd = self._losvd_rfft(vel, sigma)
+        fft_losvd = self._losvd_rfft(vel, sigma, spid)
 
         #pre-compute fft of the continuum template library
-        fft_template = np.fft.rfft(spec, n=self.npad, axis=0)
+        fft_template = np.fft.rfft(spec, n=self.npad[spid], axis=0)
 
         tmpl = np.fft.irfft(fft_template*fft_losvd)
 
-        return tmpl[:self.n_model_wl]
-
-    def _vel_convolve(self, spec, sigma, vel):
-        
-        #convolve input spectrum to given velocity
-        #generate kernel (in pixels)
-        losvd, nl = self._losvd(vel, sigma)
-
-        convd = convolve_fft(spec, losvd)
-        return convd
+        return tmpl[:self.n_model_wl[spid]]
 
     def _make_dusty(self, wl):
         
@@ -543,13 +564,6 @@ class sps_spec_fitter:
                 
         #Return 0.4*A(lam)/A(V)
         return 0.4*(k_cal+ k_bump)/R
-
-    def _redshift_spec(self):
-        self.red_wl       = self.wl * (1.+self.redshift)
-        if self.redshift>0:
-           self.red_mod_grid = self.mod_grid / (1+self.redshift)  
-        else:
-           self.red_mod_grid = np.copy(self.mod_grid)
  
     def _tri_interp(self, data_cube, value1, value2, value3, array1, array2, array3):
         #locate vertices
@@ -677,29 +691,29 @@ class sps_spec_fitter:
             
                aval = self.priorAext[0]*p[2] #[1.17,0.01]
                sav  = self.priorAext[1]
-               pav  +=  -0.5*(((p[6]-aval)/sav)**2 + np.log(2.*np.pi*sav**2))
+               pav  +=  -0.5*(((p[3]-aval)/sav)**2 + np.log(2.*np.pi*sav**2))
                              
             return pav
 
         return -np.inf
 
     def lnlhood(self, p, ndim, nparams):
+        
+        spec_lhood = 0
+        phot_lhood = 0
                 
         if self.fit_spec == True:
           
-          model_spec = self.reconstruct_spec(p, ndim)
+          for ss in range(self.n_spec):
+            model_spec = self.reconstruct_spec(p, ndim, ss)
         
-          if np.all(model_spec == 0.):
-              return -np.inf
+            if np.all(model_spec == 0.):
+                return -np.inf
 
-          ispec2 = 1./((self.log_noise*np.exp(p[5]))**2)
+            ispec2 = 1./((self.log_noise[ss]*np.exp(p[12+ss]))**2)
 
-          spec_lhood = -0.5*np.nansum((ispec2*(self.log_obj-model_spec)**2 - np.log(ispec2) + np.log(2.*np.pi))[self.goodpix_spec])
-        
-        else:
-          
-          spec_lhood = 0
-          
+            spec_lhood += -0.5*np.nansum((ispec2*(self.log_obj[ss]-model_spec)**2 - np.log(ispec2) + np.log(2.*np.pi))[self.goodpix_spec[ss]])
+                  
            
         model_phot, _ = self.reconstruct_phot(p, ndim)
          
@@ -729,103 +743,125 @@ class sps_spec_fitter:
         return spec_lhood + phot_lhood + pr
 
         
-    def _get_clyman(self, spec): #compute number of Lyman continuum photons
-        lycont_spec = np.interp(self.lycont_wls, self.wl, spec) #spectrum in erg/s/A
+    def _get_clyman(self, spec, fesc): #compute number of Lyman continuum photons
+        #spectrum in erg/s/cm2/A so it returns the flux of ionizing photons not the rate
+        lycont_spec = np.interp(self.lycont_wls, self.wl, spec) 
         nlyman = np.trapz(lycont_spec*self.lycont_wls, self.lycont_wls)/self.h/self.clight
  
         #modify input spectrum to remove photons 
-        spec[:self.ilyman] *= self.fesc
+        spec[:self.ilyman] *= fesc
     
-        return nlyman*(1.-self.fesc), spec
+        return nlyman*(1.-fesc), spec
       
-    def _get_nebular(self, emm_spec, lyscale, index): 
+    def _get_nebular(self, emm_spec): 
         
-        emm_young = self.clyman_young[index] * 4.796e-13 * emm_spec * lyscale #conversion is from QH0 to Hbeta luminosity
-        emm_old   = self.clyman_old[index]   * 4.796e-13 * emm_spec * lyscale
-                
+        emm_young = self.clyman_young * emm_spec 
+        emm_old   = self.clyman_old   * emm_spec 
+                        
         return emm_young, emm_old
 
-    def _make_spec_emm(self, vel, sigma, emm_age, emm_ion):
-        vel_pix = vel/self.kms2pix
-        sigma_pix = sigma/self.kms2pix
+    def _make_spec_emm(self, vel, sigma, emm_age, emm_ion, spid):
+        vel_pix = vel/self.kms2pix[spid] + self.vsys_pix[spid]
+        sigma_pix = np.sqrt(sigma**2+self.kernel_avg_kms[spid]**2)/self.kms2pix[spid]
 
-        temp_emm_scales = self._bi_interp(self.log_emm_scales, emm_ion, emm_age, self.emm_ions, self.emm_ages) 
-                
+        temp_emm_scales = self._bi_interp(self.log_emm_scales[spid], emm_ion, emm_age, self.emm_ions, self.emm_ages) 
+                        
         emm_grid = np.sum(temp_emm_scales[:,None]*\
-                np.diff(0.5*(1.+erf((self.diff_pix-vel_pix-self.vsys_pix)/np.sqrt(2.)/sigma_pix)), axis=1)/\
-                np.diff(10**self.log_model_wl_edges)[None,:], axis=0)
+                np.diff(0.5*(1.+erf((self.diff_pix[spid]-vel_pix)/np.sqrt(2.)/sigma_pix)), axis=1)/\
+                np.diff(10**self.log_model_wl_edges[spid])[None,:], axis=0)
 
         return emm_grid
 
-    def reconstruct_spec(self, p, ndim):
+    def reconstruct_spec(self, p, ndim, spid, retall=False):
         
         #Parameters
-        itau, iage, iav, isig, ivel, ilnf, iav_ext, _, _, isig_gas, iage_gas, iion_gas, ilyscale = [p[x] for x in range(ndim)]
+        itau, iage, iav, iav_ext, _, ilmass, isig, ivel,  isig_gas, iage_gas, iion_gas, ifesc, ilnf0, ilnf1 = [p[x] for x in range(ndim)]
         
-        #interpolate the full spectroscopic grid for lyman continuum calculation
-        spec_model = self._bi_interp(self.red_mod_grid, itau, iage, self.grid_tau, self.grid_age)
+        #interpolate the full photometric grid (non redshifted for lyman continuum photons)
+        spec_model = self._bi_interp(self.mod_grid, itau, iage, self.grid_tau, self.grid_age)
         frac_model = self._bi_interp(self.fym_grid, itau, iage, self.grid_tau, self.grid_age)
-        
+                
         #get number of lyman continuum photons
-        self.clyman_young[1], temp_young = self._get_clyman(spec_model*frac_model)
-        self.clyman_old[1],   temp_old   = self._get_clyman(spec_model*(1.-frac_model))
-       
-        #interpolate the model grid to given values
-        hr_spec_model = self._bi_interp(self.log_spec_grid, itau, iage, self.grid_tau, self.grid_age)
-        hr_frac_model = self._bi_interp(self.log_fysp_grid, itau, iage, self.grid_tau, self.grid_age)
-
+        self.clyman_young, temp_young = self._get_clyman(spec_model*frac_model, ifesc)
+        self.clyman_old,   temp_old   = self._get_clyman(spec_model*(1.-frac_model), ifesc)
+        
         #build the emission line arrays and attenuate given Av and A_extra
-        emm_lines_spec = self._make_spec_emm(ivel, isig_gas, iage_gas, iion_gas)
-        emm_young, emm_old = self._get_nebular(emm_lines_spec, ilyscale, 1)
+        emm_lines_spec     = self._make_spec_emm(ivel, isig_gas, iage_gas, iion_gas, spid)
+        emm_young, emm_old = self._get_nebular(emm_lines_spec)
         
         #Fobs = Fint*10^(-0.4*Alam/Av*Av)
-        dusty_emm = ((10**(-iav*self.spec_k_cal) * emm_old) + (10**(-(iav+iav_ext)*self.spec_k_cal) * emm_young))[:self.npix_obj]
+        dusty_emm = ((10**(-iav*self.spec_k_cal[spid]) * emm_old[:self.npix_obj[spid]]) + (10**(-(iav+iav_ext)*self.spec_k_cal[spid]) * emm_young[:self.npix_obj[spid]]))
+        dusty_emm /= (1+self.redshift)
         
+        #interpolate the spectral model grid to given values (this is in the observed frame, i.e. redshifted)
+        hr_spec_model = self._bi_interp(self.log_spec_grid[spid], itau, iage, self.grid_tau, self.grid_age)
+        hr_frac_model = self._bi_interp(self.log_fysp_grid[spid], itau, iage, self.grid_tau, self.grid_age)
+      
         #attenuate the continuum model and convolve to given dispersion
-        spec_young = self._vel_convolve_fft(hr_spec_model*hr_frac_model, isig, ivel)
-        spec_old = self._vel_convolve_fft(hr_spec_model*(1.-hr_frac_model), isig, ivel)
+        spec_young = self._vel_convolve_fft(hr_spec_model*hr_frac_model, isig, ivel, spid)
+        spec_old   = self._vel_convolve_fft(hr_spec_model*(1.-hr_frac_model), isig, ivel, spid)
+                        
+        dusty_spec = ((10**(-iav*self.spec_k_cal[spid]) * spec_old[:self.npix_obj[spid]]) + (10**(-(iav+iav_ext)*self.spec_k_cal[spid]) * spec_young[:self.npix_obj[spid]]))
+        dusty_spec /= (1+self.redshift)
                 
-        dusty_spec = (10**(-iav*self.spec_k_cal) * \
-                (spec_old + spec_young*10**(-iav_ext*self.spec_k_cal)))[:self.npix_obj]
-       
         #rescaled variance
-        scale_sig = self.log_noise*np.exp(ilnf)
+        if spid==0:
+           scale_sig = self.log_noise[spid]*np.exp(ilnf0)
+        else:
+           scale_sig = self.log_noise[spid]*np.exp(ilnf1)        
         
         #remove shape differences between spectrum and model
-        try:
-            cont_poly = self._poly_norm(self.log_obj/(dusty_spec+dusty_emm), scale_sig**2/(dusty_spec+dusty_emm)**2, self.poly_deg)
-        except:
-            cont_poly = 0.
-
-        self.cont_spec = np.copy(dusty_spec)*cont_poly
+        if self.poly_deg[spid]>0:
+           cont_poly = self._poly_norm(self.log_obj[spid]/(dusty_spec+dusty_emm), scale_sig**2/(dusty_spec+dusty_emm)**2, self.poly_deg[spid], spid)
+        else:
+           print 'WARNING: Using fixed scaling of spectra'
+           cont_poly = np.ones_like(dusty_spec) * self.fscale * 10**ilmass / self.spec_norm[spid]
+           #fig, ax = mp.subplots()
+           #ax.plot(10**self.log_wl[spid], self.log_obj[spid], '-r')
+           #ax.plot(10**self.log_wl[spid], (dusty_spec+dusty_emm)*cont_poly, '-k')
+           #mp.show()
+           
+                        
+        totspec = (dusty_spec + dusty_emm)*cont_poly
+        contspec = dusty_spec*cont_poly
+        emispec  = dusty_emm*cont_poly
         
-        #Remove continuum from observed spectrum
-        self.emiobj = self.log_obj-self.cont_spec
+        #fig, ax = mp.subplots()
+        #ax.plot(10**self.log_wl[spid], totspec, '-k')
+        #ax.plot(10**self.log_wl[spid], cont_poly, '-b')
+        #ax.plot(10**self.log_wl[spid],emispec, '-r')
+        #mp.show()
         
-        #return the re-normalized model + emission lines
-        return (dusty_spec + dusty_emm)*cont_poly
+        if retall:
+          return totspec, contspec, emispec
+        else:
+          #return the re-normalized model + emission lines
+          return  totspec
 
 
     def reconstruct_phot(self, p, ndim):
         #parameters
-        itau, iage, iav, _, _, _, iav_ext, ialpha, ilmass, _, iage_gas, iion_gas, ilyscale = [p[x] for x in range(ndim)]
+        itau, iage, iav, iav_ext, ialpha, ilmass, _, _, _, iage_gas, iion_gas, ifesc, _, _ = [p[x] for x in range(ndim)]
         
-        #interpolate the full photometric grid
-        spec_model = self._bi_interp(self.red_mod_grid, itau, iage, self.grid_tau, self.grid_age)
-        frac_model = self._bi_interp(self.fym_grid,     itau, iage, self.grid_tau, self.grid_age)
+        #interpolate the full photometric grid (non redshifted for lyman continuum photons)
+        spec_model = self._bi_interp(self.mod_grid, itau, iage, self.grid_tau, self.grid_age)
+        frac_model = self._bi_interp(self.fym_grid, itau, iage, self.grid_tau, self.grid_age)
 
         #get number of lyman continuum photons
-        self.clyman_young[0], temp_young = self._get_clyman(spec_model*frac_model)
-        self.clyman_old[0], temp_old     = self._get_clyman(spec_model*(1.-frac_model))
-
+        self.clyman_young, temp_young   = self._get_clyman(spec_model*frac_model, ifesc)
+        self.clyman_old,   temp_old     = self._get_clyman(spec_model*(1.-frac_model), ifesc)
+        
         #### Include nebular emission ####
         iemm_lines = self._bi_interp(self.emm_lines_all, iion_gas, iage_gas, self.emm_ions, self.emm_ages) 
+        emm_young, emm_old = self._get_nebular(iemm_lines)
 
-        emm_young, emm_old = self._get_nebular(iemm_lines, 1, 0)
-
+        #Send model to observed frame, scale flux down and wave up (wave is pre computed as self.wl_red)
+        tot_young = (temp_young+emm_young) / (1+self.redshift)
+        tot_old   = (temp_old  +emm_old) / (1+self.redshift)
+        
         #attenuate photometry spectrum, then compute fluxes given input bands
-        self.dusty_phot_young = (10**(-(2.27*iav)*self.k_cal) * (temp_young + emm_young))
-        self.dusty_phot_old   = (10**(-iav*self.k_cal) * (temp_old+emm_old))
+        self.dusty_phot_young = (10**(-(iav+iav_ext)*self.k_cal) * (tot_young))
+        self.dusty_phot_old   = (10**(-iav*self.k_cal) * (tot_old))
         self.dusty_phot       = self.dusty_phot_young + self.dusty_phot_old
         
         #### THERMAL DUST EMISSION ####
@@ -865,10 +901,10 @@ class sps_spec_fitter:
 
         return flux_model*(10**ilmass), (self.dusty_phot+tdust_phot)*(10**ilmass)
 
-    def _poly_norm(self, spectrum, noise, degree):
-        good = np.isfinite(noise) & np.isfinite(spectrum) & (noise > 0) & self.goodpix_spec
-        coeff = np.polyfit(self.scaled_lambda[good], spectrum[good], degree, w=1./np.sqrt(noise[good]))
-        return np.polyval(coeff, self.scaled_lambda)
+    def _poly_norm(self, spectrum, noise, degree, spid):
+        good = np.isfinite(noise) & np.isfinite(spectrum) & (noise > 0) & self.goodpix_spec[spid]
+        coeff = np.polyfit(self.scaled_lambda[spid][good], spectrum[good], degree, w=1./np.sqrt(noise[good]))
+        return np.polyval(coeff, self.scaled_lambda[spid])
 
     
     def __call__(self, p):
