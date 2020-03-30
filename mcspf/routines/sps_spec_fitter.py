@@ -20,6 +20,7 @@ import numpy.polynomial as poly
 from ..utils.magtools  import getmag_spec
 from ..utils.readfilt  import init_filters, get_filter
 from ..utils.sincrebin import sincrebin_single_os as sincrebin
+from ..utils.cbroaden  import broaden
 
 import matplotlib.pyplot as mp
 
@@ -283,6 +284,7 @@ class sps_spec_fitter:
             self.obj_noise    = []
             self.npix_obj     = []
             self.log_wl       = []
+            self.log_wl_edges = []
             self.log_obj      = []
             self.log_noise    = []
             self.goodpix_spec = []
@@ -298,6 +300,7 @@ class sps_spec_fitter:
             self.log_emm_scales = []
             self.diff_pix       = []
             self.vsys_pix       = []
+            self.obs_kms        = []
             self.kernel_avg_kms = []
             self.kms2pix        = []
             self.poly_deg       = []
@@ -327,7 +330,7 @@ class sps_spec_fitter:
         self.emmsig_lims = np.array((1.,200.)) 
         self.emmage_lims = np.array((self.emm_ages.min(), 10))
         self.emmion_lims = np.array((self.emm_ions.min(), self.emm_ions.max()))
-        self.fesc_lims = np.array((0.00, .90))
+        self.fesc_lims = np.array((-0.25, 0.90))
         self.lnf_lims = np.array((-1.5, 1.5))
 
         self.bounds = [self.tau_lims, self.age_lims, self.av_lims, \
@@ -365,6 +368,7 @@ class sps_spec_fitter:
        
         #rebin the object to log
         log_wl, dlam_log = np.linspace(np.log10(wl_obj[0]), np.log10(wl_obj[-1]), npix_obj, retstep=True)
+        log_wl_edges = np.r_[log_wl-dlam_log/2., log_wl[-1:]+dlam_log/2.]
         
         log_obj = sincrebin(10**log_wl, wl_obj, obj)
         log_noise = np.sqrt(sincrebin(10**log_wl, wl_obj, obj_noise**2))
@@ -411,7 +415,7 @@ class sps_spec_fitter:
         goodpix_spec[log_wl < min(log_model_wl)] = 0
         goodpix_spec[log_wl > max(log_model_wl)] = 0
 
-        #spectral resolutions in FWHM in A, for observations interpolate at rest-frame waves
+        #spectral resolutions in FWHM in A, for observations interpolate at observed-frame waves
         sps_res = np.interp(10**log_wl, self.red_wl, self.sps_res_val) 
         obs_res = np.interp(10**log_wl, lsf_wl, lsf_res)
                 
@@ -438,8 +442,8 @@ class sps_spec_fitter:
             for kk in range(self.n_age):
                  this_templ = self.mod_grid[jj,kk,use_wl]  
                  this_young = self.fym_grid[jj,kk,use_wl] * np.copy(this_templ)
-                 log_spec  = np.interp(10**log_model_wl,  model_spec_wl, this_templ)
-                 log_young = np.interp(10**log_model_wl,  model_spec_wl, this_young)
+                 log_spec  = np.interp(10**log_model_wl,  model_spec_wl, this_templ/(1+self.redshift))
+                 log_young = np.interp(10**log_model_wl,  model_spec_wl, this_young/(1+self.redshift))
 
                  log_spec_grid[jj,kk,:] = log_spec
                  log_fysp_grid[jj,kk,:] = np.copy(log_young)/np.copy(log_spec)
@@ -462,6 +466,7 @@ class sps_spec_fitter:
         self.obj_noise.append(obj_noise)
         self.npix_obj.append(npix_obj)
         self.log_wl.append(log_wl)
+        self.log_wl_edges.append(log_wl_edges)
         self.log_obj.append(log_obj)
         self.log_noise.append(log_noise) 
         self.goodpix_spec.append(goodpix_spec) 
@@ -473,6 +478,7 @@ class sps_spec_fitter:
         self.npad.append(npad)
         self.poly_deg.append(poly_deg)
         self.kms2pix.append(kms2pix)
+        self.obs_kms.append(obs_kms)
         self.kernel_avg_kms.append(kernel_avg_kms)
         self.log_spec_grid.append(log_spec_grid)
         self.log_fysp_grid.append(log_fysp_grid)
@@ -749,7 +755,8 @@ class sps_spec_fitter:
         nlyman = np.trapz(lycont_spec*self.lycont_wls, self.lycont_wls)/self.h/self.clight
  
         #modify input spectrum to remove photons 
-        spec[:self.ilyman] *= fesc
+        if fesc>0:
+           spec[:self.ilyman] *= fesc
     
         return nlyman*(1.-fesc), spec
       
@@ -761,15 +768,21 @@ class sps_spec_fitter:
         return emm_young, emm_old
 
     def _make_spec_emm(self, vel, sigma, emm_age, emm_ion, spid):
+        
         vel_pix = vel/self.kms2pix[spid] + self.vsys_pix[spid]
-        sigma_pix = np.sqrt(sigma**2+self.kernel_avg_kms[spid]**2)/self.kms2pix[spid]
+        
+        #Here assume the narrowest line is defined by the resolution of the observations
+        #Need to extend the array by one element because of the diff functions below. 
+        #Resolution is a smooth function so it should be ok
+        obs_kms = np.r_[self.obs_kms[spid],self.obs_kms[spid][-1]]
+        sigma_pix = np.sqrt(sigma**2+obs_kms**2)/self.kms2pix[spid]
 
         temp_emm_scales = self._bi_interp(self.log_emm_scales[spid], emm_ion, emm_age, self.emm_ions, self.emm_ages) 
-                        
+                                
         emm_grid = np.sum(temp_emm_scales[:,None]*\
-                np.diff(0.5*(1.+erf((self.diff_pix[spid]-vel_pix)/np.sqrt(2.)/sigma_pix)), axis=1)/\
-                np.diff(10**self.log_model_wl_edges[spid])[None,:], axis=0)
-
+                np.diff(0.5*(1.+erf((self.diff_pix[spid]-vel_pix)[:,:self.npix_obj[spid]+1]/np.sqrt(2.)/sigma_pix)), axis=1)/\
+                np.diff(10**self.log_wl_edges[spid])[None,:], axis=0)
+        
         return emm_grid
 
     def reconstruct_spec(self, p, ndim, spid, retall=False):
@@ -790,19 +803,17 @@ class sps_spec_fitter:
         emm_young, emm_old = self._get_nebular(emm_lines_spec)
         
         #Fobs = Fint*10^(-0.4*Alam/Av*Av)
-        dusty_emm = ((10**(-iav*self.spec_k_cal[spid]) * emm_old[:self.npix_obj[spid]]) + (10**(-(iav+iav_ext)*self.spec_k_cal[spid]) * emm_young[:self.npix_obj[spid]]))
-        dusty_emm /= (1+self.redshift)
+        dusty_emm = ((10**(-iav*self.spec_k_cal[spid]) * emm_old) + (10**(-(iav+iav_ext)*self.spec_k_cal[spid]) * emm_young))
         
         #interpolate the spectral model grid to given values (this is in the observed frame, i.e. redshifted)
         hr_spec_model = self._bi_interp(self.log_spec_grid[spid], itau, iage, self.grid_tau, self.grid_age)
         hr_frac_model = self._bi_interp(self.log_fysp_grid[spid], itau, iage, self.grid_tau, self.grid_age)
       
         #attenuate the continuum model and convolve to given dispersion
-        spec_young = self._vel_convolve_fft(hr_spec_model*hr_frac_model, isig, ivel, spid)
-        spec_old   = self._vel_convolve_fft(hr_spec_model*(1.-hr_frac_model), isig, ivel, spid)
+        spec_young = self._vel_convolve_fft(hr_spec_model*hr_frac_model, isig, ivel, spid)[:self.npix_obj[spid]]
+        spec_old   = self._vel_convolve_fft(hr_spec_model*(1.-hr_frac_model), isig, ivel, spid)[:self.npix_obj[spid]]
                         
-        dusty_spec = ((10**(-iav*self.spec_k_cal[spid]) * spec_old[:self.npix_obj[spid]]) + (10**(-(iav+iav_ext)*self.spec_k_cal[spid]) * spec_young[:self.npix_obj[spid]]))
-        dusty_spec /= (1+self.redshift)
+        dusty_spec = ((10**(-iav*self.spec_k_cal[spid]) * spec_old) + (10**(-(iav+iav_ext)*self.spec_k_cal[spid]) * spec_young))
                 
         #rescaled variance
         if spid==0:
@@ -825,13 +836,7 @@ class sps_spec_fitter:
         totspec = (dusty_spec + dusty_emm)*cont_poly
         contspec = dusty_spec*cont_poly
         emispec  = dusty_emm*cont_poly
-        
-        #fig, ax = mp.subplots()
-        #ax.plot(10**self.log_wl[spid], totspec, '-k')
-        #ax.plot(10**self.log_wl[spid], cont_poly, '-b')
-        #ax.plot(10**self.log_wl[spid],emispec, '-r')
-        #mp.show()
-        
+                
         if retall:
           return totspec, contspec, emispec
         else:

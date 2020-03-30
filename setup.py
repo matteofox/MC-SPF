@@ -79,6 +79,8 @@ if __name__ == "__main__":
                            include_dirs=include_dirs)]
     cmodules += [Extension("mcspf.utils.sincrebin", ["mcspf/utils/sincrebin.pyx"], 
                            include_dirs=include_dirs)]
+    cmodules += [Extension("mcspf.utils.cbroaden", ["mcspf/utils/cbroaden.pyx"], 
+                           include_dirs=include_dirs)]
                            
     ext_modules = cythonize(cmodules)
 

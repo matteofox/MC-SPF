@@ -343,7 +343,7 @@ for ind in range(nobj):
                else:
                   sprange = np.array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1])
                
-               spec_chisq = []
+               spec_chisq = np.zeros(temp.n_spec)
                                  
                for spid in range(temp.n_spec):
                
@@ -461,7 +461,7 @@ for ind in range(nobj):
                for i in range(ndim):
                  header += '{}_16 {}_50 {}_84 '.format(parameters[i].upper(), parameters[i].upper(),parameters[i].upper())
                header += 'LSFR_16 LSFR_50 LSFR_84 ZSPS LNZ CHI2_PHOT '
-               for in in range(len(spec_chisq)):
+               for i in range(len(spec_chisq)):
                  header += 'CHI2_SPC{} '.format(i+1)
                  
                with open(plotdir+fit_file,"w") as fitfile:
