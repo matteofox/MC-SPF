@@ -7,7 +7,7 @@ DTYPE = n.float
 ctypedef n.float_t DTYPE_t
 ctypedef n.int_t DTYPE_i
 
-def broaden(n.ndarray[DTYPE_t, ndim=1] wl, n.ndarray[DTYPE_t, ndim=1] flux, n.ndarray[DTYPE_t, ndim=1] sigma, bool variance=False ):
+def broaden(n.ndarray[DTYPE_t, ndim=1] flux, n.ndarray[DTYPE_t, ndim=1] sigma, bool variance=False ):
     #sigma should be the broadening in pixels to apply for each pixel, should have the same length as flux/wl
 
     cdef int N_elem = len(flux)

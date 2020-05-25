@@ -301,7 +301,7 @@ class sps_spec_fitter:
             self.diff_pix       = []
             self.vsys_pix       = []
             self.obs_kms        = []
-            self.kernel_avg_kms = []
+            self.kernel_kms     = []
             self.kms2pix        = []
             self.poly_deg       = []
             self.scaled_lambda  = []
@@ -330,7 +330,7 @@ class sps_spec_fitter:
         self.emmsig_lims = np.array((1.,200.)) 
         self.emmage_lims = np.array((self.emm_ages.min(), 10))
         self.emmion_lims = np.array((self.emm_ions.min(), self.emm_ions.max()))
-        self.fesc_lims = np.array((-0.25, 0.90))
+        self.fesc_lims = np.array((-0.50, 0.50))
         self.lnf_lims = np.array((-1.5, 1.5))
 
         self.bounds = [self.tau_lims, self.age_lims, self.av_lims, \
@@ -423,11 +423,8 @@ class sps_spec_fitter:
 
         sps_kms = (sps_res/2.355)*(self.clight/1e13)/((10**log_wl)/(1+self.redshift))
         obs_kms = (obs_res/2.355)*(self.clight/1e13)/((10**log_wl)) #Wave here has to be obs frame
-        kernel_kms = np.sqrt(obs_kms**2 - sps_kms**2) #observations lower resolution
-        kernel_avg_kms = np.nanmedian(kernel_kms)
-        if not np.isfinite(kernel_avg_kms):
-           kernel_avg_kms = 0.
-           
+        kernel_kms = np.sqrt(obs_kms**2 - sps_kms**2) #if positive then observations have lower resolution
+
         #fig, ax = mp.subplots()
         #ax.plot(10**log_wl, sps_kms, '-k')
         #ax.plot(10**log_wl, obs_kms, '-r')
@@ -454,8 +451,9 @@ class sps_spec_fitter:
         log_emm_wls = self.emm_wls[log_emm_use] *(1+self.redshift)
         log_emm_scales = self.emm_scales[:,:,log_emm_use]
         
-        #tha = np.where((log_emm_wls/(1+self.redshift) > 6560) & (log_emm_wls/(1+self.redshift) < 6565))
-        #thb = np.where((log_emm_wls/(1+self.redshift) > 4858) & (log_emm_wls/(1+self.redshift) < 4864))
+        tha = np.where((log_emm_wls/(1+self.redshift) > 6560) & (log_emm_wls/(1+self.redshift) < 6565))
+        thb = np.where((log_emm_wls/(1+self.redshift) > 4858) & (log_emm_wls/(1+self.redshift) < 4864))
+        #print tha, thb
         
         diff_pix = (log_model_wl_edges[None,:] - np.log10(log_emm_wls)[:,None])/dlam_log #in pixels
         vsys_pix = (log_model_wl[0] - log_wl[0])*np.log(10)*self.clight/kms2pix/1e13
@@ -478,8 +476,8 @@ class sps_spec_fitter:
         self.npad.append(npad)
         self.poly_deg.append(poly_deg)
         self.kms2pix.append(kms2pix)
+        self.kernel_kms.append(kernel_kms)
         self.obs_kms.append(obs_kms)
-        self.kernel_avg_kms.append(kernel_avg_kms)
         self.log_spec_grid.append(log_spec_grid)
         self.log_fysp_grid.append(log_fysp_grid)
         self.log_emm_wls.append(log_emm_wls)
@@ -522,7 +520,7 @@ class sps_spec_fitter:
         nl = self.npad[spid]//2 + 1
         losvd_rfft = np.zeros(nl, dtype=np.complex)
         vel_pix = vel/self.kms2pix[spid] + self.vsys_pix[spid]
-        sigma_pix = np.sqrt(sigma**2+self.kernel_avg_kms[spid]**2)/self.kms2pix[spid]
+        sigma_pix = sigma**2/self.kms2pix[spid]
 
         #compute the FFT
         a = vel_pix / sigma_pix
@@ -764,7 +762,7 @@ class sps_spec_fitter:
         
         emm_young = self.clyman_young * emm_spec 
         emm_old   = self.clyman_old   * emm_spec 
-                        
+        
         return emm_young, emm_old
 
     def _make_spec_emm(self, vel, sigma, emm_age, emm_ion, spid):
@@ -778,7 +776,7 @@ class sps_spec_fitter:
         sigma_pix = np.sqrt(sigma**2+obs_kms**2)/self.kms2pix[spid]
 
         temp_emm_scales = self._bi_interp(self.log_emm_scales[spid], emm_ion, emm_age, self.emm_ions, self.emm_ages) 
-                                
+                
         emm_grid = np.sum(temp_emm_scales[:,None]*\
                 np.diff(0.5*(1.+erf((self.diff_pix[spid]-vel_pix)[:,:self.npix_obj[spid]+1]/np.sqrt(2.)/sigma_pix)), axis=1)/\
                 np.diff(10**self.log_wl_edges[spid])[None,:], axis=0)
@@ -812,6 +810,11 @@ class sps_spec_fitter:
         #attenuate the continuum model and convolve to given dispersion
         spec_young = self._vel_convolve_fft(hr_spec_model*hr_frac_model, isig, ivel, spid)[:self.npix_obj[spid]]
         spec_old   = self._vel_convolve_fft(hr_spec_model*(1.-hr_frac_model), isig, ivel, spid)[:self.npix_obj[spid]]
+        
+        #Now convolve to intrumental resolution only if observations are lower res than model
+        if np.all(np.isfinite(self.kernel_kms[spid])):
+              spec_young = broaden(spec_young, self.kernel_kms[spid]/self.kms2pix[spid])
+              spec_old   = broaden(spec_old,   self.kernel_kms[spid]/self.kms2pix[spid])
                         
         dusty_spec = ((10**(-iav*self.spec_k_cal[spid]) * spec_old) + (10**(-(iav+iav_ext)*self.spec_k_cal[spid]) * spec_young))
                 
