@@ -60,8 +60,8 @@ def redir_stdout(to=os.devnull):
 class sps_spec_fitter:
 
     def __init__(self, redshift, phot_mod_file, flux_obs, eflux_obs, filter_list, lim_obs, \
-            cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20], fit_spec=True, fit_phot=True,
-            priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None,
+            cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
+            fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None,
             sfh_pars=['TAU','AGE']):
         
         """ Class for dealing with MultiNest fitting """
@@ -376,9 +376,9 @@ class sps_spec_fitter:
         #mask nans, pixels with zero noise and data euqal to zero
         goodpix_spec = np.isfinite(log_obj) & np.isfinite(log_noise) & (log_noise>0) & (log_obj!=0)
                   
-        #pl.plot(log_wl, log_obj, 'k-')
-        #pl.plot(log_wl[~goodpix_spec], self.log_obj[~goodpix_spec], 'ro', mec='red', ms=3.0)
-        #pl.show()
+        #mp.plot(log_wl, log_obj, 'k-')
+        #mp.plot(log_wl[~goodpix_spec], log_obj[~goodpix_spec], 'ro', mec='red', ms=3.0)
+        #mp.show()
         
         #setup for polynomial normalization
         low_log, high_log = min(log_wl), max(log_wl)
@@ -389,8 +389,8 @@ class sps_spec_fitter:
         mlam_lin = (high_lin+low_lin)/2.
         
         scaled_lambda = (log_wl - mlam_log) * 2/slam_log
-        poly_deg = min(int((high_lin - low_lin)/150.), polymax)  
-
+        poly_deg = min(int((high_lin - low_lin)/150.), polymax)
+       
         #normalize the observed spectrum
         #norm_window = ((log_wl > np.log10(mlam_lin-125)) & (log_wl < np.log10(mlam_lin+125)))
         #spec_norm = np.nansum(log_obj[norm_window]/log_noise[norm_window]**2)/np.nansum(1./log_noise[norm_window]**2)
@@ -412,9 +412,9 @@ class sps_spec_fitter:
         npad = 2**int(np.ceil(np.log2(n_model_wl)))
 
         #mask pixels outside the template range
-        goodpix_spec[log_wl < min(log_model_wl)] = 0
-        goodpix_spec[log_wl > max(log_model_wl)] = 0
-
+        goodpix_spec[log_wl < min(log_model_wl)] = False
+        goodpix_spec[log_wl > max(log_model_wl)] = False
+                
         #spectral resolutions in FWHM in A, for observations interpolate at observed-frame waves
         sps_res = np.interp(10**log_wl, self.red_wl, self.sps_res_val) 
         obs_res = np.interp(10**log_wl, lsf_wl, lsf_res)

@@ -191,9 +191,13 @@ for ind in range(nobj):
       cropspec = [catalogue['spec_minw'][catind], catalogue['spec_maxw'][catind]]
     except:
       cropspec = [100,20000]
+    
       
     try:
-      polymax = np.array((catalogue['polymax'][catind]).split(','), dtype=np.int)
+      if catalogue['polymax'][catind].dtype == np.int:
+         polymax = [catalogue['polymax'][catind]]
+      else:
+         polymax = np.array((catalogue['polymax'][catind]).split(','), dtype=np.int)
     except:
       polymax = [3,3,3,3,3,3]
        
