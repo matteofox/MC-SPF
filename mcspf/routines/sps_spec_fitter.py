@@ -7,6 +7,7 @@ from scipy.special import erf
 from astropy.modeling import models,fitting
 import astropy.io.fits as fits
 from scipy.interpolate import RectBivariateSpline as rect
+from scipy.ndimage import minimum_filter as minfilt
 from bisect import bisect_left
 import astropy.units as u
 import astropy.stats as stats
@@ -372,9 +373,12 @@ class sps_spec_fitter:
         
         log_obj = sincrebin(10**log_wl, wl_obj, obj)
         log_noise = np.sqrt(sincrebin(10**log_wl, wl_obj, obj_noise**2))
-
-        #mask nans, pixels with zero noise and data euqal to zero
+        
+        #mask nans, pixels with zero noise and data equal to zero
         goodpix_spec = np.isfinite(log_obj) & np.isfinite(log_noise) & (log_noise>0) & (log_obj!=0)
+
+        #Filter to avoid edge effects due to sincrebin
+        goodpix_spec = minfilt(goodpix_spec, size=3)
                   
         #mp.plot(log_wl, log_obj, 'k-')
         #mp.plot(log_wl[~goodpix_spec], log_obj[~goodpix_spec], 'ro', mec='red', ms=3.0)
@@ -828,12 +832,15 @@ class sps_spec_fitter:
         if self.poly_deg[spid]>0:
            cont_poly = self._poly_norm(self.log_obj[spid]/(dusty_spec+dusty_emm), scale_sig**2/(dusty_spec+dusty_emm)**2, self.poly_deg[spid], spid)
         else:
-           print 'WARNING: Using fixed scaling of spectra'
+           print('WARNING: Using fixed scaling of spectra')
            cont_poly = np.ones_like(dusty_spec) * self.fscale * 10**ilmass / self.spec_norm[spid]
-           #fig, ax = mp.subplots()
-           #ax.plot(10**self.log_wl[spid], self.log_obj[spid], '-r')
-           #ax.plot(10**self.log_wl[spid], (dusty_spec+dusty_emm)*cont_poly, '-k')
-           #mp.show()
+        
+        #fig, ax = mp.subplots()
+        #ok = (self.goodpix_spec[spid]) 
+        #ax.scatter(10**self.log_wl[spid][ok], self.log_obj[spid][ok], marker='o', color='red')
+        #ax.plot(10**self.log_wl[spid][ok], self.log_obj[spid][ok], '-r')
+        #ax.plot(10**self.log_wl[spid][ok], ((dusty_spec+dusty_emm)*cont_poly)[ok], '-k')
+        #mp.show()
            
                         
         totspec = (dusty_spec + dusty_emm)*cont_poly
