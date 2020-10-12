@@ -313,7 +313,7 @@ class sps_spec_fitter:
                 self.spec_init(self.spec_in[ind], self.res_in[ind], self.polymax[ind])
 
         else:
-          self.nspec = 0
+          self.n_spec = 0
 
         
         #set up parameter limits

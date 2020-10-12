@@ -395,7 +395,7 @@ for ind in range(nobj):
                    print('  Reduced Spec {} Chi square: {:7.3f}'.format(spid, spec_chisq[spid]))
             
             else:
-               spec_chisq = -1
+               spec_chisq = [-1]
             
             #Set number and index of random samples
             nsamp = 100
