@@ -35,7 +35,8 @@ parser.add_argument('--sfh',     default= 'exp', help='The form of the SFH, allo
 parser.add_argument('--outdir',  default= './',  help='Full path for the output directory. Default is cwd.')
 parser.add_argument('--funit',   default='mJy',  help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy')
 parser.add_argument('--sprange', default= None,  help='FILL')
-parser.add_argument('--fullout', dest='fullout', action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
+parser.add_argument('--fullout', dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
+parser.add_argument('--writesed',dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
 
 args = parser.parse_args()
 
@@ -321,10 +322,24 @@ for ind in range(nobj):
             medlsfr  = np.percentile(sfr_samp, 50)
             perclsfr = np.percentile(sfr_samp, [16,50,84])
             print('  Best fit for parameter {0}: {1:8.3f} + {2:7.3f} - {3:7.3f} (DERIVED)'.format('lSFR'.ljust(10), medlsfr, abs(perclsfr[2]-medlsfr), abs(perclsfr[0]-medlsfr)))
-            
+
             zupd = (1.+this_obj_z)*(1.+meds[4]*1e13/temp.clight)-1
 
             mflux, mphot = temp.reconstruct_phot(meds, ndim)
+            
+            if args.writesed:
+              #Best SED
+              msed_flam = mphot*temp.fscale #erg/cm2/s/A
+              msed_fnu  = msed_flam*temp.red_wl**2/temp.clight*1E26 #output in mJy
+            
+              col1 = fits.Column(name='wave_obs' , format='E', unit='Angstrom_vac', array=temp.red_wl)
+              col2 = fits.Column(name='wave_rest', format='E', unit='Angstrom_vac', array=temp.red_wl/(1+this_obj_z))
+              col3 = fits.Column(name='f_lam_obs', format='E', unit='erg/cm2/s/A',      array=msed_flam)
+              col4 = fits.Column(name='f_lam_rest',format='E', unit='erg/cm2/s/A',      array=msed_flam*(1+this_obj_z))
+              col5 = fits.Column(name='f_nu_obs',  format='E', unit='mJy',              array=msed_fnu)
+            
+              hdu = fits.BinTableHDU.from_columns([col1, col2, col3, col4, col5])
+              hdu.writeto(plotdir+'id{0}_best_sed.fits'.format(obj), overwrite=True)
             
             #Compute photometric chisquare
             oflux_lam = this_obj_flux* temp.clight/temp.pivot_wl**2
