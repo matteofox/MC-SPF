@@ -366,7 +366,12 @@ class sps_spec_fitter:
         obj = obj[range_crop] * 1E-20
         obj_noise = obj_noise[range_crop] * 1E-20
         npix_obj = len(wl_obj)
-       
+        
+        goodpix_lin =  np.isfinite(obj) & np.isfinite(obj_noise)
+        if goodpix_lin.sum() <10:
+           print('WARNING: Too few spectral valid points. Spectrum will not be fit.')
+           self.fit_spec=False
+        
         #rebin the object to log
         log_wl, dlam_log = np.linspace(np.log10(wl_obj[0]), np.log10(wl_obj[-1]), npix_obj, retstep=True)
         log_wl_edges = np.r_[log_wl-dlam_log/2., log_wl[-1:]+dlam_log/2.]
@@ -841,7 +846,6 @@ class sps_spec_fitter:
         #ax.plot(10**self.log_wl[spid][ok], self.log_obj[spid][ok], '-r')
         #ax.plot(10**self.log_wl[spid][ok], ((dusty_spec+dusty_emm)*cont_poly)[ok], '-k')
         #mp.show()
-           
                         
         totspec = (dusty_spec + dusty_emm)*cont_poly
         contspec = dusty_spec*cont_poly
