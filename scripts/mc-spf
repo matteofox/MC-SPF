@@ -167,27 +167,42 @@ for ind in range(nobj):
     this_obj_bands = np.asarray(this_obj_bands)  
     
     print("      Object detected in {} out of {} bands".format(len(this_obj_flux)-np.sum(this_obj_islim), len(this_obj_flux)))
-   
-    try:
-      spec_file = (catalogue['spec_file'][catind]).strip()
-      if ',' in spec_file:
-        spec_file = spec_file.split(',')
-      else:
-        spec_file = [spec_file]
-      for ss in spec_file:
-         print("      Found Spectrum {}".format(ss))
-    except:
-      spec_file = [None]
-      
-    try:
-      res_file =  (catalogue['res_file'][catind]).strip()
-      if ',' in res_file:
-        res_file = res_file.split(',')
-      else:
-        res_file = [res_file]
-    except:
-      res_file = [None]
     
+    spec_file = []
+    try:
+      _spec_file = (catalogue['spec_file'][catind]).strip()
+      if ',' in spec_file:
+        _spec_file = spec_file.split(',')
+      else:
+        _spec_file = [_spec_file]
+        
+      for ss in _spec_file:
+         if os.path.isfile(ss):
+           print("      Found Spectrum {}".format(ss))
+           spec_file.append(ss)
+    except:
+      pass
+      
+    if len(spec_file) == 0:
+       spec_file = [None]
+
+    res_file = []
+    try:
+      _res_file = (catalogue['res_file'][catind]).strip()
+      if ',' in res_file:
+        _res_file = res_file.split(',')
+      else:
+        _res_file = [_res_file]
+        
+      for ss in _res_file:
+         if os.path.isfile(ss):
+           res_file.append(ss)
+    except:
+      pass
+      
+    if len(res_file) == 0:
+       res_file = [None]
+          
     try:
       cropspec = [catalogue['spec_minw'][catind], catalogue['spec_maxw'][catind]]
     except:

@@ -404,7 +404,7 @@ class sps_spec_fitter:
         #norm_window = ((log_wl > np.log10(mlam_lin-125)) & (log_wl < np.log10(mlam_lin+125)))
         #spec_norm = np.nansum(log_obj[norm_window]/log_noise[norm_window]**2)/np.nansum(1./log_noise[norm_window]**2)
         
-        dummy, spec_norm, dummy = stats.sigma_clipped_stats(log_obj)
+        dummy, spec_norm, dummy = stats.sigma_clipped_stats(log_obj[goodpix_spec])
         
         log_obj   = log_obj/spec_norm
         log_noise = log_noise/spec_norm
