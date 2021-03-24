@@ -316,8 +316,8 @@ class sps_spec_fitter:
           self.n_spec = 0
        
         #Verify validity of user requested min tau and age
-        mintau_valid = np.max([self.grid_tau.min(), mintau])
-        minage_valid = np.max([self.grid_age.min(), minage])
+        mintau_valid = np.max((self.grid_tau.min(), mintau))
+        minage_valid = np.max((self.grid_age.min(), minage))
         
         #set up parameter limits
         self.tau_lims = np.array((mintau_valid, self.grid_tau.max()))
