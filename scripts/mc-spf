@@ -34,6 +34,8 @@ parser.add_argument('--sampeff', default= 0.7,   help='Sampling efficiency in th
 parser.add_argument('--sfh',     default= 'exp', help='The form of the SFH, allowed values are exp for exponential, del for delayed tau models, or a fits file for custom made sfhs default=exp')
 parser.add_argument('--outdir',  default= './',  help='Full path for the output directory. Default is cwd.')
 parser.add_argument('--funit',   default='mJy',  help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy')
+parser.add_argument('--minage',  default=100,    help='The minimum age of the SFH in Myr. Default = 100')
+parser.add_argument('--mintau',  default=300,    help='The minimum tau of the SFH in Myr. Default = 300')
 parser.add_argument('--sprange', default= None,  help='FILL')
 parser.add_argument('--fullout', dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
 parser.add_argument('--writesed',dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
@@ -233,7 +235,7 @@ for ind in range(nobj):
                this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                res_in=res_file, filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                Gpriors=Gpriors, priorAext=priorAext, fit_spec=fit_spec, fit_phot=fit_phot, \
-               polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, dl=dl) as temp:
+               polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, dl=dl, minage=args.minage, mintau=args.mintau) as temp:
     
           pymultinest.run(temp.lnlhood, temp._scale_cube, ndim, sampling_efficiency=args.sampeff, resume=False, \
                    outputfiles_basename=out_fmt.format(obj), verbose=True, multimodal=False, \

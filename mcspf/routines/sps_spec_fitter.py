@@ -63,7 +63,7 @@ class sps_spec_fitter:
     def __init__(self, redshift, phot_mod_file, flux_obs, eflux_obs, filter_list, lim_obs, \
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
             fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None,
-            sfh_pars=['TAU','AGE']):
+            sfh_pars=['TAU','AGE'], minage=100, mintau=300):
         
         """ Class for dealing with MultiNest fitting """
         
@@ -314,12 +314,15 @@ class sps_spec_fitter:
 
         else:
           self.n_spec = 0
-
+       
+        #Verify validity of user requested min tau and age
+        mintau_valid = np.max([self.grid_tau.min(), mintau])
+        minage_valid = np.max([self.grid_age.min(), minage])
         
         #set up parameter limits
-        self.tau_lims = np.array((self.grid_tau.min(), self.grid_tau.max()))
+        self.tau_lims = np.array((mintau_valid, self.grid_tau.max()))
         if sfh_pars[1]=='AGE':
-          self.age_lims = np.array((self.grid_age.min(), self.gal_age)) #self.grid_age.max()))
+          self.age_lims = np.array((minage_valid, self.gal_age))
         else:
           self.age_lims = np.array((self.grid_age.min(), self.grid_age.max()))
         self.av_lims = np.array((0., 4.))
