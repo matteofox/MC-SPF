@@ -151,7 +151,7 @@ class sps_spec_fitter:
         
         self.grid_tau = np.unique(ext_tau)
         self.grid_age = np.unique(ext_age)
-        
+                
         self.n_tau = len(self.grid_tau)
         self.n_age = len(self.grid_age)
         
@@ -320,7 +320,10 @@ class sps_spec_fitter:
         minage_valid = np.max((self.grid_age.min(), minage))
         
         #set up parameter limits
-        self.tau_lims = np.array((mintau_valid, self.grid_tau.max()))
+        if sfh_pars[0]=='TAU':
+          self.tau_lims = np.array((mintau_valid, self.grid_tau.max()))
+        else:
+          self.tau_lims = np.array((self.grid_tau.min(), self.grid_tau.max()))
         if sfh_pars[1]=='AGE':
           self.age_lims = np.array((minage_valid, self.gal_age))
         else:
