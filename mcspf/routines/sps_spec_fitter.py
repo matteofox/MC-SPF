@@ -63,7 +63,7 @@ class sps_spec_fitter:
     def __init__(self, redshift, phot_mod_file, flux_obs, eflux_obs, filter_list, lim_obs, \
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
             fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None,
-            sfh_pars=['TAU','AGE'], minage=100, mintau=300):
+            sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, minage=100, mintau=300, fescrange=[0.5,2.0]):
         
         """ Class for dealing with MultiNest fitting """
         
@@ -140,6 +140,7 @@ class sps_spec_fitter:
              except:
                 self.timeunit = 'Myr'
                 print('AGEUNIT keyword not found. Using Myr')
+            
             tau   = mfile[ii].header[sfh_pars[0]] 
             age   = mfile[ii].header[sfh_pars[1]] 
             ext_tau.append(np.float(tau))
@@ -159,6 +160,8 @@ class sps_spec_fitter:
         
         #output grid
         self.mod_grid = np.zeros((self.n_tau, self.n_age, self.n_wl), dtype=np.float)
+        self.sfh_grid = np.zeros((self.n_tau, self.n_age, 14000), dtype=np.float)
+        self.age_grid = np.zeros((self.n_tau, self.n_age, 2),     dtype=np.float)
         
         #grid where the fractional flux from young populations is stored
         self.fym_grid = np.zeros_like(self.mod_grid)
@@ -167,17 +170,53 @@ class sps_spec_fitter:
             mdata  = np.array(mfile[ii].data,  dtype=np.float)
             mmass  = mfile[ii].header['MSTAR']
             mmetal = mfile[ii].header['METAL']
-            mtau   = mfile[ii].header[sfh_pars[0]] 
-            mage   = mfile[ii].header[sfh_pars[1]] 
+            if sfh_age_par == -1:
+               mage = mfile[ii].header['AGE']
+            elif sfh_age_par >=0 and sfh_age_par<=10:
+               mage = mfile[ii].header[sfh_pars[sfh_age_par]]
+            else:
+               mage = sfh_age_par      
             
-            tau_idx = np.where(mtau == self.grid_tau)[0]
-            age_idx = np.where(mage == self.grid_age)[0]
+            mpar0   = mfile[ii].header[sfh_pars[0]] 
+            mpar1   = mfile[ii].header[sfh_pars[1]] 
             
-            self.mod_grid[tau_idx, age_idx, :] = np.interp(self.wl, twl, mdata[:, 0]/mmass, left=0, right=0)
-            self.fym_grid[tau_idx, age_idx, :] = np.interp(self.wl, twl, mdata[:, 1], left=0, right=0)
+            par0_idx = np.where(mpar0 == self.grid_tau)[0]
+            par1_idx = np.where(mpar1 == self.grid_age)[0]
+            
+            self.mod_grid[par0_idx, par1_idx, :] = np.interp(self.wl, twl, mdata[:, 0]/mmass, left=0, right=0)
+            self.fym_grid[par0_idx, par1_idx, :] = np.interp(self.wl, twl, mdata[:, 1], left=0, right=0)
+            self.age_grid[par0_idx, par1_idx, :] = mage
 
         mfile.close() 
-
+        
+        if sfh_type=='custom':
+        
+           sfh_mod_file = phot_mod_file.replace('.fits','_sfh.fits')
+           if os.path.isfile(sfh_mod_file):
+             sfile = fits.open(sfh_mod_file)
+             for ii in range(1,num_ext):            
+               sdata   = np.array(sfile[ii].data,  dtype=np.float)
+               slength = sfile[ii].header['NAXIS2']
+               spar0    = sfile[ii].header[sfh_pars[0]] 
+               spar1    = sfile[ii].header[sfh_pars[1]] 
+               
+               par0_idx = np.where(spar0 == self.grid_tau)[0]
+               par1_idx = np.where(spar1 == self.grid_age)[0]
+               
+               ratio_extrap = sdata[-1,1]/sdata[-2,1]
+               
+               self.sfh_grid[par0_idx, par1_idx, :slength] = sdata[:,1]
+               
+               for ss in range(len(sdata), np.max((len(sdata)+1000,14000))):
+                   self.sfh_grid[par0_idx, par1_idx,ss] = self.sfh_grid[par0_idx, par1_idx,ss-1]*ratio_extrap
+               
+               #self.sfh_grid[par0_idx, par1_idx, slength:] = sdata[-1,1]   
+               
+               #mp.plot(np.arange(14000),self.sfh_grid[tau_idx,age_idx,:])
+               #mp.plot(sdata[:,1])
+               #mp.show()           
+        
+        
         #some information on the BC03 spectral resolution (FWHM is 3A in the optical)
         self.sps_res_val = np.copy(self.wl)/300.
         self.sps_res_val[(self.wl >= 3200) & (self.wl <= 9500)] = 3.
@@ -337,7 +376,7 @@ class sps_spec_fitter:
         self.emmsig_lims = np.array((1.,200.)) 
         self.emmage_lims = np.array((self.emm_ages.min(), 10))
         self.emmion_lims = np.array((self.emm_ions.min(), self.emm_ions.max()))
-        self.fesc_lims = np.array((-0.50, 0.50))
+        self.fesc_lims = np.array((fescrange[0], fescrange[1]))
         self.lnf_lims = np.array((-1.5, 1.5))
 
         self.bounds = [self.tau_lims, self.age_lims, self.av_lims, \
@@ -931,6 +970,15 @@ class sps_spec_fitter:
         coeff = np.polyfit(self.scaled_lambda[spid][good], spectrum[good], degree, w=1./np.sqrt(noise[good]))
         return np.polyval(coeff, self.scaled_lambda[spid])
 
+    def reconstruct_sfh(self, p, ndim):
+        #parameters
+        ipar0, ipar1, _, _, _, _, _, _, _, _, _, _, _, _ = [p[x] for x in range(ndim)]
+        
+        #interpolate the sfh grid
+        sfh_interp = self._bi_interp(self.sfh_grid, ipar0, ipar1, self.grid_tau, self.grid_age)
+        age_interp = self._bi_interp(self.age_grid, ipar0, ipar1, self.grid_tau, self.grid_age)
+
+        return sfh_interp, age_interp[0]
     
     def __call__(self, p):
         lp = self.lnprior(p, ndim)

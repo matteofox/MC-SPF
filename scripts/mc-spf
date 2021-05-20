@@ -36,7 +36,8 @@ parser.add_argument('--outdir',  default= './',  help='Full path for the output 
 parser.add_argument('--funit',   default= 'mJy', help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy')
 parser.add_argument('--minage',  default= 100,   type=float, help='The minimum age of the SFH in Myr. Default = 100')
 parser.add_argument('--mintau',  default= 300,   type=float, help='The minimum tau of the SFH in Myr. Default = 300')
-parser.add_argument('--sprange', default= None,  help='FILL')
+parser.add_argument('--sprange', default= None,    help='Spectral range for plotting')
+parser.add_argument('--fescrange', default= None,  help='Range of log10 escape fraction Default = -0.5,0.5')
 parser.add_argument('--fullout', dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
 parser.add_argument('--writesed',dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
 
@@ -66,13 +67,33 @@ modeldir = os.path.dirname(sys.modules['mcspf'].__file__)+'/models/'
 if args.sfh =='exp':
    model_file = modeldir+'SPS/Models_exp_bc03hr.fits'
    sfh_pars = ['TAU', 'AGE']
+   sfh_func = sfh.expsfh
+   sfh_type = 'exp'
+   sfh_age_par = 1
 elif args.sfh =='del':
    model_file = modeldir+'SPS/Models_del_bc03hr.fits'
    sfh_pars = ['TAU', 'AGE']
+   sfh_func = sfh.delsfh
+   sfh_type = 'del'
+   sfh_age_par = 1
 elif os.path.isfile(args.sfh):
    model_file = args.sfh
    tmphdu = fits.open(model_file)
    sfh_pars = [tmphdu[0].header['PAR1'], tmphdu[0].header['PAR2']]
+   sfh_func = 'none'
+   sfh_type = 'custom'
+   if (tmphdu[0].header['PAR1']).lower() == 'age':
+      sfh_age_par = 0
+   elif  (tmphdu[0].header['PAR2']).lower() == 'age':
+      sfh_age_par = 1
+   else:
+      try:
+        sfh_age_par = tmphdu[1].header['AGE']
+        sfh_age_par = -1 #Means read it from the header
+      except:
+        sfh_age_par = 13500
+        print('WARNING: SFH Age is not a free parameter of this custom sfh and AGE is not given in the header.')
+        print('         SFRs will be incorrect.') 
 else:
    print("SFH not understood and is not a valid file. Aborting...")
    exit()
@@ -99,6 +120,11 @@ if args.objlist is None:
 else:
    objlist = np.array(args.objlist.split(), dtype=int)
    nobj = len(objlist)
+
+if args.fescrange is None:
+   fescrange=[-0.5,0.5]
+else:
+   fescrange = np.array(args.fescrange.split(), dtype=float)
 
 #Open filter file
 ffilt = np.loadtxt(args.filtfile, dtype=object) 
@@ -220,7 +246,7 @@ for ind in range(nobj):
       polymax = [3,3,3,3,3,3]
        
     
-    parameters = [sfh_pars[0].lower(), sfh_pars[1].lower(), 'Av', 'Av_extra', 'Dale_alpha', 'lMstar', 'sigma', 'vel', 'sigma_gas', 'age_gas', 'ion_gas', 'fesc', 'lnf1', 'lnf2']
+    parameters = [sfh_pars[0].capitalize(), sfh_pars[1].capitalize(), 'Av', 'Av_extra', 'Dale_alpha', 'lMstar', 'sigma', 'vel', 'sigma_gas', 'age_gas', 'ion_gas', 'fesc', 'lnf1', 'lnf2']
     
     ndim = len(parameters)
             
@@ -235,7 +261,9 @@ for ind in range(nobj):
                this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                res_in=res_file, filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                Gpriors=Gpriors, priorAext=priorAext, fit_spec=fit_spec, fit_phot=fit_phot, \
-               polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, dl=dl, minage=args.minage, mintau=args.mintau) as temp:
+               polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
+               sfh_age_par = sfh_age_par, dl=dl, minage=args.minage, \
+               mintau=args.mintau,fescrange=fescrange) as temp:
     
           pymultinest.run(temp.lnlhood, temp._scale_cube, ndim, sampling_efficiency=args.sampeff, resume=False, \
                    outputfiles_basename=out_fmt.format(obj), verbose=True, multimodal=False, \
@@ -264,7 +292,8 @@ for ind in range(nobj):
           with sps_spec_fitter(this_obj_z, model_file, this_obj_flux, this_obj_err, \
                 this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                 filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
-                res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, dl=dl) as temp:
+                res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
+                sfh_age_par=sfh_age_par, dl=dl) as temp:
                             
             a = pymultinest.Analyzer(n_params=ndim, outputfiles_basename=out_fmt.format(obj))
             values = a.get_equal_weighted_posterior()
@@ -334,8 +363,13 @@ for ind in range(nobj):
             
             for ind,ii in enumerate(rsamples):
                 tsamp = values[ii,:-1]
-                sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0],sfh.expsfh)*10**(tsamp[5]))
-            
+                if sfh_type is not 'custom':
+                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], sfh_func, timeunit=temp.timeunit)*10**(tsamp[5]))
+                else:
+                   sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
+                   sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[5]))
+                
+                
             medlsfr  = np.percentile(sfr_samp, 50)
             perclsfr = np.percentile(sfr_samp, [16,50,84])
             print('  Best fit for parameter {0}: {1:8.3f} + {2:7.3f} - {3:7.3f} (DERIVED)'.format('lSFR'.ljust(10), medlsfr, abs(perclsfr[2]-medlsfr), abs(perclsfr[0]-medlsfr)))
@@ -448,8 +482,15 @@ for ind in range(nobj):
                    age_array = np.arange(int(tsamp[1])*1000)/1000.
                 else:
                    print('{Time unit {} not implemented yet.}'.format(temp.timeunit))
-                ax4.plot(age_array, sfh.expsfh(age_array,tsamp[0])*10**(tsamp[5]),color='black', alpha=0.1, lw=0.6, rasterized=False)
-                                  
+                
+                if sfh_type is not 'custom':
+                   ax4.plot(age_array, sfh_func(age_array,tsamp[0])*10**(tsamp[5]),color='black', alpha=0.1, lw=0.6, rasterized=False)
+                else:
+                   sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
+                   age_samp = int(age_samp)
+                   sfh_samp = sfh_samp[:age_samp]
+                   ax4.plot(np.arange(age_samp), sfh_samp*10**(tsamp[5]),color='black', alpha=0.1, lw=0.6, rasterized=False)
+                                 
             
             #Datapoints on photometry
             ax1.errorbar(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, yerr=temp.eflux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, fmt='none', capsize=3, zorder=30, ecolor='black')
@@ -466,8 +507,22 @@ for ind in range(nobj):
             triangle.hist2d(values[:,1], values[:,0], ax=ax5)
             ax5.axvline(meds[1], color='firebrick', lw=1)
             ax5.axhline(meds[0], color='firebrick', lw=1)
-            ax5.set_xlabel(r'$\mathrm{{Age~[{}]}}$'.format(temp.timeunit))
-            ax5.set_ylabel(r'$\tau$ [{}]'.format(temp.timeunit))
+            
+            parx_str = sfh_pars[1].capitalize()
+            pary_str = sfh_pars[0].capitalize()
+            
+            if 'Age' in parx_str or 'Tau' in parx_str:
+               parx_unit = '['+temp.timeunit+']'
+            else:
+               parx_unit = ''   
+            
+            if 'Age' in pary_str or 'Tau' in pary_str:
+               pary_unit = '['+temp.timeunit+']'
+            else:
+               pary_unit = ''   
+            
+            ax5.set_xlabel(r'$\mathrm{{{}~{}}}$'.format(parx_str,parx_unit))
+            ax5.set_ylabel(r'$\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
              
             pl.savefig(plotdir+'id{0}_mudf_summary.pdf'.format(obj), bbox_inches='tight')
             
