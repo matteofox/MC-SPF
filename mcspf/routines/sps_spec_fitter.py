@@ -190,8 +190,9 @@ class sps_spec_fitter:
         mfile.close() 
         
         if sfh_type=='custom':
-        
+           
            sfh_mod_file = phot_mod_file.replace('.fits','_sfh.fits')
+           print('      Reading SFH file: {}'.format(sfh_mod_file))
            if os.path.isfile(sfh_mod_file):
              sfile = fits.open(sfh_mod_file)
              for ii in range(1,num_ext):            

@@ -523,7 +523,7 @@ for ind in range(nobj):
             
             ax5.set_xlabel(r'$\mathrm{{{}~{}}}$'.format(parx_str,parx_unit))
             ax5.set_ylabel(r'$\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
-             
+            
             pl.savefig(plotdir+'id{0}_mudf_summary.pdf'.format(obj), bbox_inches='tight')
             
             #Now deal with the fit file
