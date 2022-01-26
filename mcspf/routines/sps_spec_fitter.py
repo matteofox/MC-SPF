@@ -208,7 +208,7 @@ class sps_spec_fitter:
                
                self.sfh_grid[par0_idx, par1_idx, :slength] = sdata[:,1]
                
-               for ss in range(len(sdata), np.max((len(sdata)+1000,14000))):
+               for ss in range(slength, np.min((slength+1000,14000-1))):
                    self.sfh_grid[par0_idx, par1_idx,ss] = self.sfh_grid[par0_idx, par1_idx,ss-1]*ratio_extrap
                
                #self.sfh_grid[par0_idx, par1_idx, slength:] = sdata[-1,1]   
