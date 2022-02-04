@@ -36,7 +36,8 @@ parser.add_argument('--outdir',  default= './',  help='Full path for the output 
 parser.add_argument('--funit',   default= 'mJy', help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy')
 parser.add_argument('--minage',  default= 100,   type=float, help='The minimum age of the SFH in Myr. Default = 100')
 parser.add_argument('--mintau',  default= 300,   type=float, help='The minimum tau of the SFH in Myr. Default = 300')
-parser.add_argument('--sprange', default= None,    help='Spectral range for plotting')
+parser.add_argument('--sprange', default= None,    help='Y-axis (Flux) range for spectra plots')
+parser.add_argument('--phrange', default= None,    help='Y-axis (Luminosity) range for photometry plot')
 parser.add_argument('--fescrange', default= None,  help='Range of log10 escape fraction Default = -0.5,0.5')
 parser.add_argument('--fullout', dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
 parser.add_argument('--writesed',dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
@@ -409,7 +410,7 @@ for ind in range(nobj):
             if temp.n_spec > 0 :
                
                if args.sprange is not None:
-                  sprange = np.array((args.sprange).split(',')[1:], dtype=np.float)
+                  sprange = np.array((args.sprange).split(','), dtype=np.float)
                else:
                   sprange = np.array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1])
                
@@ -495,8 +496,13 @@ for ind in range(nobj):
             #Datapoints on photometry
             ax1.errorbar(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, yerr=temp.eflux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, fmt='none', capsize=3, zorder=30, ecolor='black')
             ax1.plot(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, 'ko', ms=6.0)
+
+            if args.phrange is not None:
+               phrange = np.array((args.phrange).split(','), dtype=np.float)
+            else:
+               phrange = np.array([1e6,2e11])
           
-            ax1.axis([0.8*np.min(temp.pivot_wl/1e4),1.2*np.nanmax(temp.pivot_wl/1e4),1e6,2e11])
+            ax1.axis([0.8*np.min(temp.pivot_wl/1e4),1.2*np.nanmax(temp.pivot_wl/1e4),phrange[0],phrange[1]])
             ax1.set_xlabel(r'$\lambda~\mathrm{obs.}~[\mu \mathrm{m}]$')
             ax1.set_ylabel(r'$\lambda~L_\lambda [L_\odot]$')
             
