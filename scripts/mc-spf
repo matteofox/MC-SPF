@@ -29,8 +29,8 @@ parser.add_argument('incat',    help='Path of the input catalogue')
 parser.add_argument('filtfile', help='Path of the filter translation file')
 parser.add_argument('mode',     help='Please select the run mode: FIT, FITPHOT, FITSPEC or PLOT')
 parser.add_argument('--objlist', default= None,  help='String with the IDs of the objects to fit separated by a space')
-parser.add_argument('--nlive',   default= 500,   help='Number of live points in the Multinest solver, default=500')
-parser.add_argument('--sampeff', default= 0.7,   help='Sampling efficiency in the Multinest solver. Lower is more precise and computationally expensive, default=0.7')
+parser.add_argument('--nlive',   default= 500,   type=int,   help='Number of live points in the Multinest solver, default=500')
+parser.add_argument('--sampeff', default= 0.7,   type=float, help='Sampling efficiency in the Multinest solver. Lower is more precise and computationally expensive, default=0.7')
 parser.add_argument('--sfh',     default= 'exp', help='The form of the SFH, allowed values are exp for exponential, del for delayed tau models, or a fits file for custom made sfhs default=exp')
 parser.add_argument('--outdir',  default= './',  help='Full path for the output directory. Default is cwd.')
 parser.add_argument('--funit',   default= 'mJy', help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy')
@@ -38,6 +38,7 @@ parser.add_argument('--minage',  default= 100,   type=float, help='The minimum a
 parser.add_argument('--mintau',  default= 300,   type=float, help='The minimum tau of the SFH in Myr. Default = 300')
 parser.add_argument('--sprange', default= None,    help='Y-axis (Flux) range for spectra plots')
 parser.add_argument('--phrange', default= None,    help='Y-axis (Luminosity) range for photometry plot')
+parser.add_argument('--agerange', default= None,    help='X-axis (Time) range for SFH plot')
 parser.add_argument('--fescrange', default= None,  help='Range of log10 escape fraction Default = -0.5,0.5')
 parser.add_argument('--fullout', dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
 parser.add_argument('--writesed',dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
@@ -501,6 +502,10 @@ for ind in range(nobj):
                phrange = np.array((args.phrange).split(','), dtype=np.float)
             else:
                phrange = np.array([1e6,2e11])
+
+            if args.agerange is not None:
+               agerange = np.array((args.agerange).split(','), dtype=np.float)
+               ax4.set_xlim(agerange)
           
             ax1.axis([0.8*np.min(temp.pivot_wl/1e4),1.2*np.nanmax(temp.pivot_wl/1e4),phrange[0],phrange[1]])
             ax1.set_xlabel(r'$\lambda~\mathrm{obs.}~[\mu \mathrm{m}]$')
