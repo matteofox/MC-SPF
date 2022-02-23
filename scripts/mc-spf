@@ -42,6 +42,7 @@ parser.add_argument('--agerange', default= None,    help='X-axis (Time) range fo
 parser.add_argument('--fescrange', default= None,  help='Range of log10 escape fraction Default = -0.5,0.5')
 parser.add_argument('--fullout', dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
 parser.add_argument('--writesed',dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
+parser.add_argument('--nsampwrite', default=100, help='Number of sample SEDs to write in case writesed is true.')
 
 args = parser.parse_args()
 
@@ -381,19 +382,32 @@ for ind in range(nobj):
             mflux, mphot = temp.reconstruct_phot(meds, ndim)
             
             if args.writesed:
+              print('  Writing SEDs...')
               #Best SED
               msed_flam = mphot*temp.fscale #erg/cm2/s/A
-              msed_fnu  = msed_flam*temp.red_wl**2/temp.clight*1E26 #output in mJy
+              msed_fnu  = msed_flam*temp.red_wl**2/temp.clight*1E26 #output in funit
             
               col1 = fits.Column(name='wave_obs' , format='E', unit='Angstrom_vac', array=temp.red_wl)
               col2 = fits.Column(name='wave_rest', format='E', unit='Angstrom_vac', array=temp.red_wl/(1+this_obj_z))
               col3 = fits.Column(name='f_lam_obs', format='E', unit='erg/cm2/s/A',      array=msed_flam)
               col4 = fits.Column(name='f_lam_rest',format='E', unit='erg/cm2/s/A',      array=msed_flam*(1+this_obj_z))
-              col5 = fits.Column(name='f_nu_obs',  format='E', unit='mJy',              array=msed_fnu)
+              col5 = fits.Column(name='f_nu_obs',  format='E', unit=args.funit,         array=msed_fnu)
             
               hdu = fits.BinTableHDU.from_columns([col1, col2, col3, col4, col5])
               hdu.writeto(plotdir+'id{0}_best_sed.fits'.format(obj), overwrite=True)
-            
+              
+              hdu = fits.BinTableHDU.from_columns([col1])
+              nsamples = np.min((nsamp, args.nsampwrite))
+              colarray=[col1]
+              
+              for ind, ii in enumerate(rsamples[:nsamples]):
+                   tsamp = values[ii,:-1]
+                   tflux, tphot = temp.reconstruct_phot(tsamp, ndim)
+                   colarray.append(fits.Column(name='f_nu_obs_{}'.format(ind),  format='E', unit=args.funit,  array=tphot*temp.fscale*temp.red_wl**2/temp.clight*1E26))
+              
+              hdu = fits.BinTableHDU.from_columns(colarray)
+              hdu.writeto(plotdir+'id{0}_samp_sed.fits'.format(obj), overwrite=True)
+                   
             #Compute photometric chisquare
             oflux_lam = this_obj_flux* temp.clight/temp.pivot_wl**2
             oflux_err_lam = this_obj_err* temp.clight/temp.pivot_wl**2
