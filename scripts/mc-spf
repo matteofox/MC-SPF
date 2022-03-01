@@ -83,7 +83,18 @@ elif os.path.isfile(args.sfh):
    model_file = args.sfh
    tmphdu = fits.open(model_file)
    sfh_pars = [tmphdu[0].header['PAR1'], tmphdu[0].header['PAR2']]
-   sfh_func = 'none'
+   try:
+     sfhstrfunc = tmphdu[0].header['SFHFUNC']
+     if sfhstrfunc =='exp':
+       sfh_func = sfh.expsfh
+     elif sfhstrfunc =='del':
+       sfh_func = sfh.delsfh
+     elif sfhstrfunc =='exptrunc':
+       sfh_func = sfh.exptruncsfh
+     else:
+       sfh_func = 'none'
+   except:
+     sfh_func = 'none'   
    sfh_type = 'custom'
    if (tmphdu[0].header['PAR1']).lower() == 'age':
       sfh_age_par = 0
@@ -367,7 +378,7 @@ for ind in range(nobj):
             for ind,ii in enumerate(rsamples):
                 tsamp = values[ii,:-1]
                 if sfh_type is not 'custom':
-                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], sfh_func, timeunit=temp.timeunit)*10**(tsamp[5]))
+                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[5]))
                 else:
                    sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
                    sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[5]))
@@ -499,8 +510,8 @@ for ind in range(nobj):
                 else:
                    print('{Time unit {} not implemented yet.}'.format(temp.timeunit))
                 
-                if sfh_type is not 'custom':
-                   ax4.plot(age_array, sfh_func(age_array,tsamp[0])*10**(tsamp[5]),color='black', alpha=0.1, lw=0.6, rasterized=False)
+                if sfh_func is not 'none':
+                   ax4.plot(np.arange(len(temp.sfh_array)), sfh_func(temp.sfh_array, tsamp[1],tsamp[0])*10**(tsamp[5]),color='black', alpha=0.1, lw=0.6, rasterized=False)
                 else:
                    sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
                    age_samp = int(age_samp)

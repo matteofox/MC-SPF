@@ -160,7 +160,6 @@ class sps_spec_fitter:
         
         #output grid
         self.mod_grid = np.zeros((self.n_tau, self.n_age, self.n_wl), dtype=np.float)
-        self.sfh_grid = np.zeros((self.n_tau, self.n_age, 14000), dtype=np.float)
         self.age_grid = np.zeros((self.n_tau, self.n_age, 2),     dtype=np.float)
         
         #grid where the fractional flux from young populations is stored
@@ -189,13 +188,19 @@ class sps_spec_fitter:
 
         mfile.close() 
         
+        self.age_max = int(np.nanmax(self.age_grid))
+        self.sfh_grid = np.zeros((self.n_tau, self.n_age, self.age_max), dtype=np.float)
+        self.sfh_array = np.ones((self.age_max), dtype=np.float)
+        
         if sfh_type=='custom':
            
            sfh_mod_file = phot_mod_file.replace('.fits','_sfh.fits')
            print('      Reading SFH file: {}'.format(sfh_mod_file))
            if os.path.isfile(sfh_mod_file):
              sfile = fits.open(sfh_mod_file)
+             
              for ii in range(1,num_ext):            
+             
                sdata   = np.array(sfile[ii].data,  dtype=np.float)
                slength = sfile[ii].header['NAXIS2']
                spar0    = sfile[ii].header[sfh_pars[0]] 
@@ -204,13 +209,15 @@ class sps_spec_fitter:
                par0_idx = np.where(spar0 == self.grid_tau)[0]
                par1_idx = np.where(spar1 == self.grid_age)[0]
                
-               ratio_extrap = sdata[-1,1]/sdata[-2,1]
+               if slength>=self.age_max:
+                 self.sfh_grid[par0_idx, par1_idx, :] = sdata[:self.age_max,1]
+               else:
+                 self.sfh_grid[par0_idx, par1_idx, :slength] = sdata[:,1]
+                 ratio_extrap = sdata[-1,1]/sdata[-2,1]
+                 for ss in range(slength, np.min((slength+1000,self.age_max-1))):
+                    self.sfh_grid[par0_idx, par1_idx,ss] = self.sfh_grid[par0_idx, par1_idx,ss-1]*ratio_extrap
                
-               self.sfh_grid[par0_idx, par1_idx, :slength] = sdata[:,1]
-               
-               for ss in range(slength, np.min((slength+1000,14000-1))):
-                   self.sfh_grid[par0_idx, par1_idx,ss] = self.sfh_grid[par0_idx, par1_idx,ss-1]*ratio_extrap
-               
+               self.sfh_array = self.sfh_grid[0, 0,:]
                #self.sfh_grid[par0_idx, par1_idx, slength:] = sdata[-1,1]   
                
                #mp.plot(np.arange(14000),self.sfh_grid[tau_idx,age_idx,:])

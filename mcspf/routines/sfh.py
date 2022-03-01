@@ -1,6 +1,8 @@
 import numpy as np
 
-def expsfh(time, tau):
+def expsfh(dummy, time, tau):
+    
+    timearr = np.arange(int(time))
     
     _tau = np.copy(tau)
     _time = np.copy(time)
@@ -10,8 +12,10 @@ def expsfh(time, tau):
     intsfh = sfh.sum() * 1E6
     return sfh/intsfh
 
-def delsfh(time, tau):
-    
+def delsfh(dummy, time, tau):
+
+    timearr = np.arange(int(time))
+
     _tau = np.copy(tau)
     _time = np.copy(time)
         
@@ -20,17 +24,29 @@ def delsfh(time, tau):
     intsfh = sfh.sum() * 1E6
     return sfh/intsfh
 
-def ssfr(time, tau, sfh, timeunit='Myr', avgtime=10):
+def exptruncsfh(sfhcustom, agetrunc, tautrunc):
+    
+    sfr_at_qa = sfhcustom[-int(agetrunc)]
+    
+    if agetrunc>0 and tautrunc!=0:
+       sfhcustom[-int(agetrunc):] = sfr_at_qa*np.exp(-1*np.arange(int(agetrunc))/tautrunc)
+        
+    #Time must be in steps of 1 Myr
+    intsfh = sfhcustom.sum() * 1E6
+    return sfhcustom/intsfh
+
+
+def ssfr(age, tau, sfharray, sfhfunc, timeunit='Myr', avgtime=10):
 
     if timeunit == 'Gyr':
        tau *= 1000
-       time*= 1000
+       age*= 1000
 
     _tau = np.copy(tau)
-    _time = np.copy(time)
+    _age = np.copy(age)
         
-    timearr = np.arange(int(_time))
-    sfharr  = sfh(timearr, tau)
+    
+    sfharr  = sfhfunc(sfharray, age, tau)
     
     return np.average(sfharr[-int(avgtime):])
 
