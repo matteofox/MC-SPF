@@ -357,7 +357,7 @@ class sps_spec_fitter:
 
             
             for ind in range(self.n_spec):
-                self.spec_init(self.spec_in[ind], self.res_in[ind], self.polymax[ind])
+                self.spec_init(self.spec_in[ind], self.res_in[ind], self.polymax[ind], self.cropspec[2*ind:2*ind+2])
 
         else:
           self.n_spec = 0
@@ -394,7 +394,7 @@ class sps_spec_fitter:
                 
         self.ndims = len(self.bounds)   
     
-    def spec_init(self, specfile, resfile, polymax):
+    def spec_init(self, specfile, resfile, polymax, cropspec):
 
         #so it can be used in the fit           
         file = fits.open(specfile)
@@ -411,9 +411,9 @@ class sps_spec_fitter:
         lsf_wl = ((np.arange(size, dtype=np.float)+1 - crpix)*cdelt + crval)
         lsf_res = lsf_wl / lsf_res #Now in FWHM in A
         rfile.close()
-
+        
         #clip off the spectrum as requested by the user
-        range_crop = (wl_obj > self.cropspec[0]) & (wl_obj < self.cropspec[1])
+        range_crop = (wl_obj > cropspec[0]) & (wl_obj < cropspec[1])
         
         wl_obj = wl_obj[range_crop]
         obj = obj[range_crop] * 1E-20

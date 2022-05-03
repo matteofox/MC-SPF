@@ -213,8 +213,8 @@ for ind in range(nobj):
     spec_file = []
     try:
       _spec_file = (catalogue['spec_file'][catind]).strip()
-      if ',' in spec_file:
-        _spec_file = spec_file.split(',')
+      if ',' in _spec_file:
+        _spec_file = _spec_file.split(',')
       else:
         _spec_file = [_spec_file]
         
@@ -231,13 +231,14 @@ for ind in range(nobj):
     res_file = []
     try:
       _res_file = (catalogue['res_file'][catind]).strip()
-      if ',' in res_file:
-        _res_file = res_file.split(',')
+      if ',' in _res_file:
+        _res_file = _res_file.split(',')
       else:
         _res_file = [_res_file]
         
       for ss in _res_file:
          if os.path.isfile(ss):
+           print("      Found Spectral resolution file {}".format(ss))
            res_file.append(ss)
     except:
       pass
@@ -246,11 +247,10 @@ for ind in range(nobj):
        res_file = [None]
           
     try:
-      cropspec = [catalogue['spec_minw'][catind], catalogue['spec_maxw'][catind]]
+      cropspec = np.array((catalogue['spec_lim'][catind]).split(','), dtype=np.float)
     except:
       cropspec = [100,20000]
-    
-      
+          
     try:
       if catalogue['polymax'][catind].dtype == np.int:
          polymax = [catalogue['polymax'][catind]]
@@ -511,7 +511,8 @@ for ind in range(nobj):
                    print('{Time unit {} not implemented yet.}'.format(temp.timeunit))
                 
                 if sfh_func is not 'none':
-                   ax4.plot(np.arange(len(temp.sfh_array)), sfh_func(temp.sfh_array, tsamp[1],tsamp[0])*10**(tsamp[5]),color='black', alpha=0.1, lw=0.6, rasterized=False)
+                   sfh_samp = sfh_func(temp.sfh_array, tsamp[1],tsamp[0])*10**(tsamp[5])
+                   ax4.plot(np.arange(len(sfh_samp)), sfh_samp,color='black', alpha=0.1, lw=0.6, rasterized=False)
                 else:
                    sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
                    age_samp = int(age_samp)
