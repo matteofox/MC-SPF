@@ -43,6 +43,7 @@ parser.add_argument('--fescrange', default= None,  help='Range of log10 escape f
 parser.add_argument('--fullout', dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
 parser.add_argument('--writesed',dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
 parser.add_argument('--nsampwrite', default=100, help='Number of sample SEDs to write in case writesed is true.')
+parser.add_argument('--refit',   default=False, help='If true fit also objects for which a fit already exists. Default=False.')
 
 args = parser.parse_args()
 
@@ -270,7 +271,9 @@ for ind in range(nobj):
     priorAext = [1.17,0.001]
 
     if args.mode =='FIT' or args.mode=='FITSPEC' or args.mode == 'FITPHOT':
-    
+     
+     if args.refit ==True or ~(os.path.exists('{0}post_equal_weights.dat'.format(out_fmt.format(obj)))):
+      
       with sps_spec_fitter(this_obj_z, model_file, this_obj_flux, this_obj_err, \
                this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                res_in=res_file, filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
@@ -428,8 +431,13 @@ for ind in range(nobj):
             
             print('  Reduced Phot Chi square: {0:7.3f}'.format(photo_chisq))
                         
-            fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} ~~~~~ \ln Z = {4:.2f}\pm{5:.2f}$'\
+            if np.isfinite(lnz) and np.isfinite(dlnz):
+              fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} ~~~~~ \ln Z = {4:.2f}\pm{5:.2f}$'\
                      .format(obj, this_obj_z, meds[5], medlsfr, lnz, dlnz), transform=fig.transFigure)
+            else:
+              fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
+                     .format(obj, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
+            
             
             spfscale = 1E18 #go from 1e-20 to 1e-18
             
@@ -523,6 +531,7 @@ for ind in range(nobj):
             #Datapoints on photometry
             ax1.errorbar(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, yerr=temp.eflux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, fmt='none', capsize=3, zorder=30, ecolor='black')
             ax1.plot(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, 'ko', ms=6.0)
+            ax1.plot(temp.pivot_wl/1e4, mflux*temp.pivot_wl*temp.flux_to_lum/temp.lsun, marker='*', mec='magenta', mfc='none', ms=15.0, ls='none', zorder=100)
 
             if args.phrange is not None:
                phrange = np.array((args.phrange).split(','), dtype=np.float)

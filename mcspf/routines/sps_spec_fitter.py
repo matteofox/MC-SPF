@@ -797,8 +797,7 @@ class sps_spec_fitter:
                          np.log(iphot2[self.lim_obs == 0]) + np.log(2.*np.pi))) + \
                          np.nansum(np.log(terf))
         else:
-             phot_lhood = np.nansum(-0.5*((iphot2*(self.flux_obs-model_phot)**2) - \
-                     np.log(iphot2) + np.log(2.*np.pi)))
+             phot_lhood = -0.5*np.nansum(((iphot2*(self.flux_obs-model_phot)**2) - np.log(iphot2) + np.log(2.*np.pi)))
         
         #### APPLY THE PRIOR HERE  #####
         pr = self.lnprior(p, ndim)
