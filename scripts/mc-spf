@@ -40,6 +40,7 @@ parser.add_argument('--sprange', default= None,    help='Y-axis (Flux) range for
 parser.add_argument('--phrange', default= None,    help='Y-axis (Luminosity) range for photometry plot')
 parser.add_argument('--agerange', default= None,    help='X-axis (Time) range for SFH plot')
 parser.add_argument('--fescrange', default= None,  help='Range of log10 escape fraction Default = -0.5,0.5')
+parser.add_argument('--emimetal', default= 0.02,  type=float, help='Emission line metallicity Default = 0.02 (Solar value)')
 parser.add_argument('--fullout', dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
 parser.add_argument('--writesed',dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
 parser.add_argument('--nsampwrite', default=100, help='Number of sample SEDs to write in case writesed is true.')
@@ -84,19 +85,25 @@ elif os.path.isfile(args.sfh):
    model_file = args.sfh
    tmphdu = fits.open(model_file)
    sfh_pars = [tmphdu[0].header['PAR1'], tmphdu[0].header['PAR2']]
+   
    try:
      sfhstrfunc = tmphdu[0].header['SFHFUNC']
      if sfhstrfunc =='exp':
        sfh_func = sfh.expsfh
+       sfh_type = 'exp'
      elif sfhstrfunc =='del':
        sfh_func = sfh.delsfh
+       sfh_type = 'del'
      elif sfhstrfunc =='exptrunc':
        sfh_func = sfh.exptruncsfh
      else:
        sfh_func = 'none'
+       sfh_type = 'custom'
    except:
      sfh_func = 'none'   
-   sfh_type = 'custom'
+     sfh_type = 'custom'
+   
+   
    if (tmphdu[0].header['PAR1']).lower() == 'age':
       sfh_age_par = 0
    elif  (tmphdu[0].header['PAR2']).lower() == 'age':
@@ -280,7 +287,7 @@ for ind in range(nobj):
                Gpriors=Gpriors, priorAext=priorAext, fit_spec=fit_spec, fit_phot=fit_phot, \
                polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
                sfh_age_par = sfh_age_par, dl=dl, minage=args.minage, \
-               mintau=args.mintau,fescrange=fescrange) as temp:
+               mintau=args.mintau,fescrange=fescrange, emimetal=args.emimetal) as temp:
     
           pymultinest.run(temp.lnlhood, temp._scale_cube, ndim, sampling_efficiency=args.sampeff, resume=False, \
                    outputfiles_basename=out_fmt.format(obj), verbose=True, multimodal=False, \
@@ -310,7 +317,7 @@ for ind in range(nobj):
                 this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                 filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                 res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
-                sfh_age_par=sfh_age_par, dl=dl) as temp:
+                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal) as temp:
                             
             a = pymultinest.Analyzer(n_params=ndim, outputfiles_basename=out_fmt.format(obj))
             values = a.get_equal_weighted_posterior()

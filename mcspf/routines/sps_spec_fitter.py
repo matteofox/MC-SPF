@@ -63,7 +63,7 @@ class sps_spec_fitter:
     def __init__(self, redshift, phot_mod_file, flux_obs, eflux_obs, filter_list, lim_obs, \
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
             fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None,
-            sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, minage=100, mintau=300, fescrange=[0.5,2.0]):
+            sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, minage=100, mintau=300, emimetal=0.0, fescrange=[0.5,2.0]):
         
         """ Class for dealing with MultiNest fitting """
         
@@ -89,6 +89,7 @@ class sps_spec_fitter:
         self.priorAext = priorAext 
         self.cropspec = cropspec
         self.polymax = polymax
+        self.emimetal = emimetal
         
         #constants
         self.small_num = 1e-70
@@ -254,6 +255,12 @@ class sps_spec_fitter:
         rline = 0
         iline = 0
         
+        metallist = np.array([0.00020,0.00063246,0.00209426,0.00526054,0.00814761,0.01002374,0.01261915,0.01588656,0.02,0.02517851,0.03169786])
+        metalstrg = np.array(['-1.0000e-01','-1.5000e+00','-1.9800e+00','-2.0000e-01','-3.0000e-01','-3.9000e-01','-5.8000e-01','-9.8000e-01','0.0000e+00','1.0000e-01','2.0000e-01'])
+        
+        metind = np.argmin(np.abs(metallist-self.emimetal))
+        print('     Emission line metallicity requested {}, found {}'.format(self.emimetal,metallist[metind]))
+        
         with open(modeldir+'nebular_Byler.lines','r') as file:
             for line in file:
                 if line[0] != '#':
@@ -265,7 +272,7 @@ class sps_spec_fitter:
                         if rline: #Read line fluxes
                             self.emm_scales[icnt%7,icnt//7,:] = np.array(temp, dtype=np.float)*self.lsun #output should be in erg/s/QHO
                             icnt += 1
-                        if len(temp) == 3 and float(temp[0]) == 0.0:
+                        if len(temp) == 3 and temp[0] == metalstrg[metind]:
                             rline = 1
                             self.emm_ages[icnt//7] = float(temp[1])/1e6
                             self.emm_ions[icnt%7]  = float(temp[2])
