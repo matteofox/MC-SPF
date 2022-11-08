@@ -387,7 +387,7 @@ for ind in range(nobj):
             
             for ind,ii in enumerate(rsamples):
                 tsamp = values[ii,:-1]
-                if sfh_type is not 'custom':
+                if sfh_type != 'custom':
                    sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[5]))
                 else:
                    sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
@@ -450,7 +450,7 @@ for ind in range(nobj):
             
             if temp.n_spec > 0 :
                
-               if args.sprange is not None:
+               if args.sprange != None:
                   sprange = np.array((args.sprange).split(','), dtype=np.float)
                else:
                   sprange = np.array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1])
@@ -525,7 +525,7 @@ for ind in range(nobj):
                 else:
                    print('{Time unit {} not implemented yet.}'.format(temp.timeunit))
                 
-                if sfh_func is not 'none':
+                if sfh_func != 'none':
                    sfh_samp = sfh_func(temp.sfh_array, tsamp[1],tsamp[0])*10**(tsamp[5])
                    ax4.plot(np.arange(len(sfh_samp)), sfh_samp,color='black', alpha=0.1, lw=0.6, rasterized=False)
                 else:
@@ -540,12 +540,12 @@ for ind in range(nobj):
             ax1.plot(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, 'ko', ms=6.0)
             ax1.plot(temp.pivot_wl/1e4, mflux*temp.pivot_wl*temp.flux_to_lum/temp.lsun, marker='*', mec='magenta', mfc='none', ms=15.0, ls='none', zorder=100)
 
-            if args.phrange is not None:
+            if args.phrange != None:
                phrange = np.array((args.phrange).split(','), dtype=np.float)
             else:
                phrange = np.array([1e6,2e11])
 
-            if args.agerange is not None:
+            if args.agerange != None:
                agerange = np.array((args.agerange).split(','), dtype=np.float)
                ax4.set_xlim(agerange)
           
