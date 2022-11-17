@@ -58,7 +58,7 @@ def plotspec(wl, flux, color='black', style='solid', lw=1.0, mask=None, var=None
                         pl.errorbar(wl, flux, var, fmt=None, color=0.5, capsize=0.0, elinewidth=1.0, zorder=zorder-0.1)
                     pl.plot(spec_x, spec_y, '.', color=color, zorder=zorder)
                 else:
-                    masked_y = n.ma.masked_array(spec_y, mask=mask_y, zorder=zorder)
+                    masked_y = n.ma.masked_array(spec_y, mask=mask_y)
                     pl.plot(spec_x, masked_y,'.', color=color, zorder=zorder)
             else:
                 if mask is None:
@@ -67,7 +67,7 @@ def plotspec(wl, flux, color='black', style='solid', lw=1.0, mask=None, var=None
                         pl.fill_between(spec_x, spec_y-var_y, spec_y+var_y, color='0.8', zorder=zorder-0.1)
                     pl.plot(spec_x, spec_y, color=color, linestyle=style, lw=lw, zorder=zorder)
                 else:
-                    masked_y = n.ma.masked_array(spec_y, mask=mask_y, zorder=zorder)
+                    masked_y = n.ma.masked_array(spec_y, mask=mask_y)
                     pl.plot(spec_x, masked_y, color=color, linestyle=style, lw=lw, zorder=zorder)
     
     
