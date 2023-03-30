@@ -3,7 +3,7 @@ import numpy as n
 cimport numpy as n
 from cpython cimport bool
 
-DTYPE = n.float
+DTYPE = float
 ctypedef n.float_t DTYPE_t
 ctypedef n.int_t DTYPE_i
 

@@ -119,7 +119,7 @@ class sps_spec_fitter:
         num_ext = len(mfile)
         
         #pull wavelength information from the primary extension of the models
-        wdata = np.array(mfile[0].data, dtype=np.float)
+        wdata = np.array(mfile[0].data, dtype=float)
         twl = self.airtovac(wdata)
         
         #get the wavelength information for the DH02 templates to stitch the two together
@@ -144,8 +144,8 @@ class sps_spec_fitter:
             
             tau   = mfile[ii].header[sfh_pars[0]] 
             age   = mfile[ii].header[sfh_pars[1]] 
-            ext_tau.append(np.float(tau))
-            ext_age.append(np.float(age))
+            ext_tau.append(float(tau))
+            ext_age.append(float(age))
 
         #If model units are in Myr modify cosmo age accordingly
         if self.timeunit == 'Myr':
@@ -160,14 +160,14 @@ class sps_spec_fitter:
         self.mod_flux_to_lum = 1.196495E40
         
         #output grid
-        self.mod_grid = np.zeros((self.n_tau, self.n_age, self.n_wl), dtype=np.float)
-        self.age_grid = np.zeros((self.n_tau, self.n_age, 2),     dtype=np.float)
+        self.mod_grid = np.zeros((self.n_tau, self.n_age, self.n_wl), dtype=float)
+        self.age_grid = np.zeros((self.n_tau, self.n_age, 2),     dtype=float)
         
         #grid where the fractional flux from young populations is stored
         self.fym_grid = np.zeros_like(self.mod_grid)
         
         for ii in range(1,num_ext):            
-            mdata  = np.array(mfile[ii].data,  dtype=np.float)
+            mdata  = np.array(mfile[ii].data,  dtype=float)
             mmass  = mfile[ii].header['MSTAR']
             mmetal = mfile[ii].header['METAL']
             if sfh_age_par == -1:
@@ -190,8 +190,8 @@ class sps_spec_fitter:
         mfile.close() 
         
         self.age_max = int(np.nanmax(self.age_grid))
-        self.sfh_grid = np.zeros((self.n_tau, self.n_age, self.age_max), dtype=np.float)
-        self.sfh_array = np.ones((self.age_max), dtype=np.float)
+        self.sfh_grid = np.zeros((self.n_tau, self.n_age, self.age_max), dtype=float)
+        self.sfh_array = np.ones((self.age_max), dtype=float)
         
         if sfh_type=='custom':
            
@@ -202,7 +202,7 @@ class sps_spec_fitter:
              
              for ii in range(1,num_ext):            
              
-               sdata   = np.array(sfile[ii].data,  dtype=np.float)
+               sdata   = np.array(sfile[ii].data,  dtype=float)
                slength = sfile[ii].header['NAXIS2']
                spar0    = sfile[ii].header[sfh_pars[0]] 
                spar1    = sfile[ii].header[sfh_pars[1]] 
@@ -247,10 +247,10 @@ class sps_spec_fitter:
         self.clyman_young = None #A list of two elements, first is for phot, the other for spec
         self.clyman_old   = None #A list of two elements, first is for phot, the other for spec
 
-        self.emm_scales = np.zeros((7,10,128), dtype=np.float)
-        self.emm_wls    = np.zeros(128,        dtype=np.float)
-        self.emm_ages   = np.zeros(10,         dtype=np.float)
-        self.emm_ions   = np.zeros(7,         dtype=np.float)
+        self.emm_scales = np.zeros((7,10,128), dtype=float)
+        self.emm_wls    = np.zeros(128,        dtype=float)
+        self.emm_ages   = np.zeros(10,         dtype=float)
+        self.emm_ions   = np.zeros(7,         dtype=float)
         icnt = 0
         rline = 0
         iline = 0
@@ -266,11 +266,11 @@ class sps_spec_fitter:
                 if line[0] != '#':
                     temp = (line.strip()).split(None)
                     if not iline: #Read wave line
-                        self.emm_wls[:] = np.array(temp, dtype=np.float)
+                        self.emm_wls[:] = np.array(temp, dtype=float)
                         iline = 1
                     else:
                         if rline: #Read line fluxes
-                            self.emm_scales[icnt%7,icnt//7,:] = np.array(temp, dtype=np.float)*self.lsun #output should be in erg/s/QHO
+                            self.emm_scales[icnt%7,icnt//7,:] = np.array(temp, dtype=float)*self.lsun #output should be in erg/s/QHO
                             icnt += 1
                         if len(temp) == 3 and temp[0] == metalstrg[metind]:
                             rline = 1
@@ -295,7 +295,7 @@ class sps_spec_fitter:
         self.wl_edges  = np.r_[np.array([self.wl[0]-dpix[0]/2.]), np.r_[self.wl[1:]-dpix/2., np.array([self.wl[-1]+dpix[-1]/2.])]]
         self.res_lines = np.interp(self.emm_wls, self.wl, self.sps_res_val)/2.355
       
-        self.emm_lines_all = np.zeros((len(self.emm_ions), len(self.emm_ages), len(self.wl)), dtype=np.float)
+        self.emm_lines_all = np.zeros((len(self.emm_ions), len(self.emm_ages), len(self.wl)), dtype=float)
         for jj in range(len(self.emm_ions)):
           for ii in range(len(self.emm_ages)):
             this_scale = self.emm_scales[jj,ii,:]
@@ -308,7 +308,7 @@ class sps_spec_fitter:
         self.dh_alpha = np.loadtxt(modeldir+'alpha_DH02.dat', usecols=(0,))
         self.dh_nalpha = len(self.dh_alpha)
 
-        self.dh_dustemm = np.zeros((self.dh_nalpha, self.n_wl), dtype=np.float)
+        self.dh_dustemm = np.zeros((self.dh_nalpha, self.n_wl), dtype=float)
         for ii in range(self.dh_nalpha):
             tdust = 10**np.loadtxt(modeldir+'spectra_DH02.dat', usecols=(ii+1,))
             self.dh_dustemm[ii,:] = np.interp(self.wl, dh_wl, tdust)/self.wl
@@ -413,9 +413,9 @@ class sps_spec_fitter:
         rfile = fits.open(resfile)
         rhdr = rfile[0].header
         
-        lsf_res = np.asarray(rfile[0].data, dtype=np.float) #This is R
+        lsf_res = np.asarray(rfile[0].data, dtype=float) #This is R
         crval, cdelt, crpix, size = rhdr['CRVAL1'], rhdr['CD1_1'], 1., rhdr['NAXIS1']
-        lsf_wl = ((np.arange(size, dtype=np.float)+1 - crpix)*cdelt + crval)
+        lsf_wl = ((np.arange(size, dtype=float)+1 - crpix)*cdelt + crval)
         lsf_res = lsf_wl / lsf_res #Now in FWHM in A
         rfile.close()
         
@@ -500,8 +500,8 @@ class sps_spec_fitter:
         #mp.show()
                 
         #set up storage for log models
-        log_spec_grid = np.zeros((self.n_tau, self.n_age, n_model_wl), dtype=np.float)
-        log_fysp_grid = np.zeros((self.n_tau, self.n_age, n_model_wl), dtype=np.float)
+        log_spec_grid = np.zeros((self.n_tau, self.n_age, n_model_wl), dtype=float)
+        log_fysp_grid = np.zeros((self.n_tau, self.n_age, n_model_wl), dtype=float)
         
         cnt = 0
         for jj in range(self.n_tau):
@@ -587,7 +587,7 @@ class sps_spec_fitter:
         """Generate analytic fourier transform of the LOSVD following Cappellari et al. 2016 and pPXF,
         simplified for purposes here"""
         nl = self.npad[spid]//2 + 1
-        losvd_rfft = np.zeros(nl, dtype=np.complex)
+        losvd_rfft = np.zeros(nl, dtype=complex)
         vel_pix = vel/self.kms2pix[spid] + self.vsys_pix[spid]
         sigma_pix = sigma**2/self.kms2pix[spid]
 
@@ -703,7 +703,7 @@ class sps_spec_fitter:
             fwl, ftrans = fobj.transmission
             ftrans = np.maximum(ftrans, 0.)
             trans_interp = np.asarray(np.interp(self.red_wl, fwl, \
-                    ftrans, left=0., right=0.), dtype=np.float) 
+                    ftrans, left=0., right=0.), dtype=float) 
 
             #normalize transmission
             ttrans = np.trapz(np.copy(trans_interp)*self.red_wl, self.red_wl) #for integrating f_lambda
@@ -727,7 +727,7 @@ class sps_spec_fitter:
         
         #compute observed frame magnitudes and fluxes, return both
         
-        tflux = np.zeros(self.n_bands, dtype=np.float)
+        tflux = np.zeros(self.n_bands, dtype=float)
 
         getmag_spec(self.red_wl, np.einsum('ji,i->ij', self.bands, \
                 spec*self.red_wl), self.n_bands, tflux)
@@ -790,7 +790,7 @@ class sps_spec_fitter:
            
         model_phot, _ = self.reconstruct_phot(p, ndim)
          
-        if np.all(model_phot == 0.):
+        if np.all(model_phot == 0.) or np.any(~np.isfinite(model_phot)):
            return -np.inf
 
         iphot2 = 1./(self.eflux_obs**2)
@@ -893,11 +893,14 @@ class sps_spec_fitter:
            scale_sig = self.log_noise[spid]*np.exp(ilnf1)        
         
         #remove shape differences between spectrum and model
-        if self.poly_deg[spid]>0:
-           cont_poly = self._poly_norm(self.log_obj[spid]/(dusty_spec+dusty_emm), scale_sig**2/(dusty_spec+dusty_emm)**2, self.poly_deg[spid], spid)
-        else:
-           print('WARNING: Using fixed scaling of spectra')
-           cont_poly = np.ones_like(dusty_spec) * self.fscale * 10**ilmass / self.spec_norm[spid]
+        try:
+           if self.poly_deg[spid]>0:
+             cont_poly = self._poly_norm(self.log_obj[spid]/(dusty_spec+dusty_emm), scale_sig**2/(dusty_spec+dusty_emm)**2, self.poly_deg[spid], spid)
+           else:
+             print('WARNING: Using fixed scaling of spectra')
+             cont_poly = np.ones_like(dusty_spec) * self.fscale * 10**ilmass / self.spec_norm[spid]
+        except:
+           return np.zeros((2))
         
         #fig, ax = mp.subplots()
         #ok = (self.goodpix_spec[spid]) 

@@ -255,7 +255,7 @@ for ind in range(nobj):
        res_file = [None]
           
     try:
-      cropspec = np.array((catalogue['spec_lim'][catind]).split(','), dtype=np.float)
+      cropspec = np.array((catalogue['spec_lim'][catind]).split(','), dtype=float)
     except:
       cropspec = [100,20000]
           
@@ -263,7 +263,7 @@ for ind in range(nobj):
       if catalogue['polymax'][catind].dtype == np.int:
          polymax = [catalogue['polymax'][catind]]
       else:
-         polymax = np.array((catalogue['polymax'][catind]).split(','), dtype=np.int)
+         polymax = np.array((catalogue['polymax'][catind]).split(','), dtype=int)
     except:
       polymax = [3,3,3,3,3,3]
        
@@ -451,7 +451,7 @@ for ind in range(nobj):
             if temp.n_spec > 0 :
                
                if args.sprange != None:
-                  sprange = np.array((args.sprange).split(','), dtype=np.float)
+                  sprange = np.array((args.sprange).split(','), dtype=float)
                else:
                   sprange = np.array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1])
                
@@ -541,12 +541,12 @@ for ind in range(nobj):
             ax1.plot(temp.pivot_wl/1e4, mflux*temp.pivot_wl*temp.flux_to_lum/temp.lsun, marker='*', mec='magenta', mfc='none', ms=15.0, ls='none', zorder=100)
 
             if args.phrange != None:
-               phrange = np.array((args.phrange).split(','), dtype=np.float)
+               phrange = np.array((args.phrange).split(','), dtype=float)
             else:
                phrange = np.array([1e6,2e11])
 
             if args.agerange != None:
-               agerange = np.array((args.agerange).split(','), dtype=np.float)
+               agerange = np.array((args.agerange).split(','), dtype=float)
                ax4.set_xlim(agerange)
           
             ax1.axis([0.8*np.min(temp.pivot_wl/1e4),1.2*np.nanmax(temp.pivot_wl/1e4),phrange[0],phrange[1]])
