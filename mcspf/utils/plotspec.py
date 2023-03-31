@@ -10,21 +10,21 @@ def plotspec(wl, flux, color='black', style='solid', lw=1.0, mask=None, var=None
     wl_edges = n.r_[wl - dwl/2., wl[-1] + dwl/2.]
     npts = len(wl_edges)
 
-    spec_x = n.zeros(2*npts, n.float)
-    spec_y = n.zeros(2*npts, n.float)
+    spec_x = n.zeros(2*npts, float)
+    spec_y = n.zeros(2*npts, float)
 
     spec_x[0::2], spec_x[1::2] = wl_edges, wl_edges
     spec_y[1:-1:2], spec_y[2::2] = flux, flux
 
     if var is not None:
-        var_y = n.zeros(2*npts, n.float)
+        var_y = n.zeros(2*npts, float)
         var_y[1:-1:2], var_y[2::2] = var, var
         var_y = var_y[1:-1]
 
 
     if mask is not None:
         mask = (mask == False)
-        mask_y = n.zeros(2*npts, n.bool)
+        mask_y = n.zeros(2*npts, bool)
         mask_y[1:-1:2], mask_y[2::2] = mask, mask
         mask_y = mask_y[1:-1]
 
