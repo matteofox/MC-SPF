@@ -144,7 +144,7 @@ class sps_spec_fitter:
                 self.timeunit = mfile[ii].header['AGEUNIT']
              except:
                 self.timeunit = 'Myr'
-                print('AGEUNIT keyword not found. Using Myr')
+                print('      WARNING: AGEUNIT keyword not found. Using Myr')
             
             tau   = mfile[ii].header[sfh_pars[0]] 
             age   = mfile[ii].header[sfh_pars[1]] 
@@ -200,7 +200,7 @@ class sps_spec_fitter:
         if sfh_type=='custom':
            
            sfh_mod_file = phot_mod_file.replace('.fits','_sfh.fits')
-           print('      Reading SFH file: {}'.format(sfh_mod_file))
+           print('      INFO: Reading SFH file: {}'.format(sfh_mod_file))
            if os.path.isfile(sfh_mod_file):
              sfile = fits.open(sfh_mod_file)
              
@@ -272,7 +272,7 @@ class sps_spec_fitter:
         metalstrg = np.array(['-1.0000e-01','-1.5000e+00','-1.9800e+00','-2.0000e-01','-3.0000e-01','-3.9000e-01','-5.8000e-01','-9.8000e-01','0.0000e+00','1.0000e-01','2.0000e-01'])
         
         metind = np.argmin(np.abs(metallist-self.emimetal))
-        print('     Emission line metallicity requested {}, found {}'.format(self.emimetal,metallist[metind]))
+        print('      INFO: Emission line metallicity requested {}, found {:5.4f}'.format(self.emimetal,metallist[metind]))
         
         with open(modeldir+'nebular_Byler.lines','r') as file:
             for line in file:
