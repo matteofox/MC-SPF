@@ -117,6 +117,10 @@ class sps_spec_fitter:
         
         mfile = fits.open(phot_mod_file)
         num_ext = len(mfile)
+        try:
+          self.mod_lib = mfile[0].header['MODLIB']
+        except:
+          self.mod_lib = 'unk'
         
         #pull wavelength information from the primary extension of the models
         wdata = np.array(mfile[0].data, dtype=float)
@@ -225,11 +229,20 @@ class sps_spec_fitter:
                #mp.plot(sdata[:,1])
                #mp.show()           
         
-        
-        #some information on the BC03 spectral resolution (FWHM is 3A in the optical)
-        self.sps_res_val = np.copy(self.wl)/300.
-        self.sps_res_val[(self.wl >= 3200) & (self.wl <= 9500)] = 3.
-        
+        if (self.mod_lib).lower() == 'bc03':
+            #some information on the BC03 spectral resolution (FWHM is 3A in the optical)
+            self.sps_res_val = np.copy(self.wl)/300.
+            self.sps_res_val[(self.wl >= 3200) & (self.wl <= 9500)] = 3.
+        elif (self.mod_lib).lower() == 'cb19':
+            self.sps_res_val = np.zeros_like(self.wl)+2.
+            self.sps_res_val[(self.wl >= 912) & (self.wl <= 3540)] = 1.
+            self.sps_res_val[(self.wl >= 3540) & (self.wl <= 7350)] = 2.5
+            self.sps_res_val[(self.wl >= 7350) & (self.wl <= 9400)] = 1.
+        else: 
+            print('WARNING: Spectral library unknown, BC03 resolution will be used for spectral fits.')
+            self.sps_res_val = np.copy(self.wl)/300.
+            self.sps_res_val[(self.wl >= 3200) & (self.wl <= 9500)] = 3.
+
         self.mod_grid[~np.isfinite(self.mod_grid)] = 0.
         self.fym_grid[~np.isfinite(self.fym_grid)] = 0.
 
@@ -386,13 +399,13 @@ class sps_spec_fitter:
         self.ext_lims = np.array((0, 4.))
         self.alpha_lims = np.array((self.dh_alpha[0], self.dh_alpha[-1]))
         self.mass_lims = np.array((3,12))
-        self.sig_lims = np.array((10., 500.))
+        self.sig_lims = np.array((1., 500.))
         self.vel_lims = np.array((-250., 250.))
         self.emmsig_lims = np.array((1.,200.)) 
         self.emmage_lims = np.array((self.emm_ages.min(), 10))
         self.emmion_lims = np.array((self.emm_ions.min(), self.emm_ions.max()))
         self.fesc_lims = np.array((fescrange[0], fescrange[1]))
-        self.lnf_lims = np.array((-1.5, 1.5))
+        self.lnf_lims = np.array((-2, 2))
 
         self.bounds = [self.tau_lims, self.age_lims, self.av_lims, \
                 self.ext_lims, self.alpha_lims,  self.mass_lims, \

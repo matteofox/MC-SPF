@@ -18,7 +18,7 @@ def broaden(n.ndarray[DTYPE_t, ndim=1] flux, n.ndarray[DTYPE_t, ndim=1] sigma, b
     cdef n.ndarray[DTYPE_t, ndim=1] ttpix = n.zeros(N_elem, dtype=DTYPE)
 
     cdef n.ndarray[DTYPE_t, ndim=1]  width = 2.355*3*sigma #sample the distribution out to 3*FWHM
-    cdef n.ndarray[DTYPE_i, ndim=1]  spix = n.asarray(n.floor(sigma*3.), dtype=n.int)
+    cdef n.ndarray[DTYPE_i, ndim=1]  spix = n.asarray(n.floor(sigma*3.), dtype=int)
     cdef n.ndarray[DTYPE_t, ndim=1]  s2 = sigma**2
 
     if variance:
