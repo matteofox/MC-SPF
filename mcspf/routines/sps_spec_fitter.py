@@ -378,6 +378,7 @@ class sps_spec_fitter:
             
             for ind in range(self.n_spec):
                 self.spec_init(self.spec_in[ind], self.res_in[ind], self.polymax[ind], self.cropspec[2*ind:2*ind+2])
+                print('      INFO: Polynomial degree used for spectrum {} is: {}'.format(ind+1,self.poly_deg[ind]))
 
         else:
           self.n_spec = 0
@@ -442,7 +443,7 @@ class sps_spec_fitter:
         
         goodpix_lin =  np.isfinite(obj) & np.isfinite(obj_noise)
         if goodpix_lin.sum() <10:
-           print('WARNING: Too few spectral valid points. Spectrum will not be fit.')
+           print('    WARNING: Too few spectral valid points. Spectrum will not be fit.')
            self.fit_spec=False
         
         #rebin the object to log
@@ -472,7 +473,7 @@ class sps_spec_fitter:
         
         scaled_lambda = (log_wl - mlam_log) * 2/slam_log
         poly_deg = min(int((high_lin - low_lin)/150.), polymax)
-       
+        
         #normalize the observed spectrum
         #norm_window = ((log_wl > np.log10(mlam_lin-125)) & (log_wl < np.log10(mlam_lin+125)))
         #spec_norm = np.nansum(log_obj[norm_window]/log_noise[norm_window]**2)/np.nansum(1./log_noise[norm_window]**2)
@@ -910,7 +911,7 @@ class sps_spec_fitter:
            if self.poly_deg[spid]>0:
              cont_poly = self._poly_norm(self.log_obj[spid]/(dusty_spec+dusty_emm), scale_sig**2/(dusty_spec+dusty_emm)**2, self.poly_deg[spid], spid)
            else:
-             print('WARNING: Using fixed scaling of spectra')
+             print('     WARNING: Using fixed scaling of spectra')
              cont_poly = np.ones_like(dusty_spec) * self.fscale * 10**ilmass / self.spec_norm[spid]
         except:
            return np.zeros((2))

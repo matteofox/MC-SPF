@@ -27,32 +27,39 @@ cosmo=FlatLambdaCDM(H0=70,Om0=0.3)
 parser = argparse.ArgumentParser(description='MonteCarlo Stellar Population Fitting Code')
 
 grpinp = parser.add_argument_group('Input control arguments')
-grpinp.add_argument('incat',    help='Path of the input catalogue')
-grpinp.add_argument('filtfile', help='Path of the filter translation file')
-grpinp.add_argument('mode',     help='Please select the run mode: FIT, FITPHOT, FITSPEC or PLOT')
-grpinp.add_argument('--objlist', default= None,  help='String with the IDs of the objects to fit separated by a space')
-grpinp.add_argument('--sfh',     default= 'exp', help='The form of the SFH, allowed values are exp for exponential, del for delayed tau models, or a fits file for custom made sfhs default=exp')
-grpinp.add_argument('--funit',   default= 'mJy', help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy')
-grpinp.add_argument('--emimetal', default= 0.02,  type=float, help='Emission line metallicity Default = 0.02 (Solar value)')
+
+grpinp.add_argument('incat',       help='Path of the input catalogue')
+grpinp.add_argument('filtfile',    help='Path of the filter translation file')
+grpinp.add_argument('mode',        help='Please select the run mode: FIT, FITPHOT, FITSPEC or PLOT')
+grpinp.add_argument('--objlist',   default= None,  help='String with the IDs of the objects to fit separated by a space')
+grpinp.add_argument('--sfh',       default= 'exp', help='The form of the SFH, allowed values are exp for exponential, del \
+                                                         for delayed tau models, or a fits file for custom made sfhs default=exp')
+grpinp.add_argument('--funit',     default= 'mJy', help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy')
+grpinp.add_argument('--emimetal',  default= 0.02,  type=float, help='Emission line metallicity Default = 0.02 (Solar value)')
 
 grpfit = parser.add_argument_group('Fit related arguments')
-grpfit.add_argument('--nlive',   default= 500,   type=int,   help='Number of live points in the Multinest solver, default=500')
-grpfit.add_argument('--sampeff', default= 0.7,   type=float, help='Sampling efficiency in the Multinest solver. Lower is more precise and computationally expensive, default=0.7')
-grpfit.add_argument('--minage',  default= 100,   type=float, help='The minimum age of the SFH in Myr. Default = 100')
-grpfit.add_argument('--mintau',  default= 300,   type=float, help='The minimum tau of the SFH in Myr. Default = 300')
+
+grpfit.add_argument('--nlive',     default= 500,   type=int,   help='Number of live points in the Multinest solver, default=500')
+grpfit.add_argument('--sampeff',   default= 0.7,   type=float, help='Sampling efficiency in the Multinest solver. Lower is more \
+                                                                     precise and computationally expensive, default=0.7')
+grpfit.add_argument('--minage',    default= 100,   type=float, help='The minimum age of the SFH in Myr. Default = 100')
+grpfit.add_argument('--mintau',    default= 300,   type=float, help='The minimum tau of the SFH in Myr. Default = 300')
 grpfit.add_argument('--fescrange', default= None,  help='Multiplicative escape fraction Default = -0.5,0.5')
-grpfit.add_argument('--refit',   default=False, help='If true fit also objects for which a fit already exists. Default=False.')
+grpfit.add_argument('--refit',     default=False, help='If true fit also objects for which a fit already exists. Default=False.')
 
 grpplt = parser.add_argument_group('Plot related arguments')
-grpplt.add_argument('--sprange', default= None,    help='Y-axis (Flux) range for spectra plots')
-grpplt.add_argument('--phrange', default= None,    help='Y-axis (Luminosity) range for photometry plot')
-grpplt.add_argument('--agerange', default= None,    help='X-axis (Time) range for SFH plot')
+
+grpplt.add_argument('--sprange',   default= None,    help='Y-axis (Flux) range for spectra plots')
+grpplt.add_argument('--phrange',   default= None,    help='Y-axis (Luminosity) range for photometry plot')
+grpplt.add_argument('--agerange',  default= None,    help='X-axis (Time) range for SFH plot')
 grpplt.add_argument('--rasterize', dest='rasterize', action='store_true', help='If set, will make smaller summary plots by rasterizing some lines.')
 
 grpout = parser.add_argument_group('Output control arguments')
-grpout.add_argument('--outdir',  default= './',  help='Full path for the output directory. Default is cwd.')
-grpout.add_argument('--fullout', dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
-grpout.add_argument('--writesed',dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
+
+grpout.add_argument('--outdir',    default= './',  help='Full path for the output directory, subdirs Fits+suffix and Plots+suffix will be created there. Default is cwd.')
+grpout.add_argument('--dirsuffix', default= './',  help='Suffix for the Fits and Plots directories.')
+grpout.add_argument('--fullout',   dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
+grpout.add_argument('--writesed',  dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
 grpout.add_argument('--nsampwrite', default=100, help='Number of sample SEDs to write in case writesed is true.')
 
 args = parser.parse_args()
@@ -130,8 +137,8 @@ else:
    print("ERROR: SFH not understood and is not a valid file. Aborting...")
    exit()
 
-plotdir         = rootdir+'Plots/'
-fitsdir         = rootdir+'Fits/'
+plotdir         = rootdir+'Plots{}/'.format(args.dirsuffix)
+fitsdir         = rootdir+'Fits{}/'.format(args.dirsuffix)
 
 if not os.path.isdir(fitsdir):
        os.makedirs(fitsdir)
