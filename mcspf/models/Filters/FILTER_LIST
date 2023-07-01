@@ -191,3 +191,7 @@
 191     MUSE NIR   (tophat)
 192	UVIT FUV F154W (UVIT FUV Filter, in-orbit calib. July 2017 (A. Subramaniam))
 193     HAWKI_Ks (from eso website)
+194     JWST MIRI F770W
+195     JWST MIRI F1000W
+196     JWST MIRI F1280W
+197     JWST MIRI F1800W
