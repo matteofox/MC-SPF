@@ -603,7 +603,7 @@ class sps_spec_fitter:
         nl = self.npad[spid]//2 + 1
         losvd_rfft = np.zeros(nl, dtype=complex)
         vel_pix = vel/self.kms2pix[spid] + self.vsys_pix[spid]
-        sigma_pix = sigma**2/self.kms2pix[spid]
+        sigma_pix = sigma/self.kms2pix[spid] #20230718 Removed sigma**2 due to issue with units
 
         #compute the FFT
         a = vel_pix / sigma_pix
@@ -873,7 +873,7 @@ class sps_spec_fitter:
         #interpolate the full photometric grid (non redshifted for lyman continuum photons)
         spec_model = self._bi_interp(self.mod_grid, itau, iage, self.grid_tau, self.grid_age)
         frac_model = self._bi_interp(self.fym_grid, itau, iage, self.grid_tau, self.grid_age)
-                
+
         #get number of lyman continuum photons
         self.clyman_young, temp_young = self._get_clyman(spec_model*frac_model, ifesc)
         self.clyman_old,   temp_old   = self._get_clyman(spec_model*(1.-frac_model), ifesc)
@@ -888,7 +888,7 @@ class sps_spec_fitter:
         #interpolate the spectral model grid to given values (this is in the observed frame, i.e. redshifted)
         hr_spec_model = self._bi_interp(self.log_spec_grid[spid], itau, iage, self.grid_tau, self.grid_age)
         hr_frac_model = self._bi_interp(self.log_fysp_grid[spid], itau, iage, self.grid_tau, self.grid_age)
-      
+                
         #attenuate the continuum model and convolve to given dispersion
         spec_young = self._vel_convolve_fft(hr_spec_model*hr_frac_model, isig, ivel, spid)[:self.npix_obj[spid]]
         spec_old   = self._vel_convolve_fft(hr_spec_model*(1.-hr_frac_model), isig, ivel, spid)[:self.npix_obj[spid]]
@@ -919,8 +919,9 @@ class sps_spec_fitter:
         #fig, ax = mp.subplots()
         #ok = (self.goodpix_spec[spid]) 
         #ax.scatter(10**self.log_wl[spid][ok], self.log_obj[spid][ok], marker='o', color='red')
-        #ax.plot(10**self.log_wl[spid][ok], self.log_obj[spid][ok], '-r')
-        #ax.plot(10**self.log_wl[spid][ok], ((dusty_spec+dusty_emm)*cont_poly)[ok], '-k')
+        #ax.plot(10**self.log_wl[spid][ok], self.log_obj[spid][ok], '-k')
+        #ax.plot(10**self.log_wl[spid][ok], ((dusty_spec+dusty_emm)*cont_poly)[ok], '-r')
+        #ax.plot(10**self.log_wl[spid][ok], ((dusty_spec)/np.median(dusty_spec))[ok], '-b')
         #mp.show()
                         
         totspec = (dusty_spec + dusty_emm)*cont_poly
