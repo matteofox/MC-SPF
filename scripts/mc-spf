@@ -57,7 +57,7 @@ grpplt.add_argument('--rasterize', dest='rasterize', action='store_true', help='
 grpout = parser.add_argument_group('Output control arguments')
 
 grpout.add_argument('--outdir',    default= './',  help='Full path for the output directory, subdirs Fits+suffix and Plots+suffix will be created there. Default is cwd.')
-grpout.add_argument('--dirsuffix', default= './',  help='Suffix for the Fits and Plots directories.')
+grpout.add_argument('--dirsuffix', default= '',  help='Suffix for the Fits and Plots directories.')
 grpout.add_argument('--fullout',   dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
 grpout.add_argument('--writesed',  dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
 grpout.add_argument('--nsampwrite', default=100, help='Number of sample SEDs to write in case writesed is true.')
@@ -234,7 +234,7 @@ for ind in range(nobj):
     this_obj_bands = np.asarray(this_obj_bands)  
     
     print("      INFO: Object detected in {} out of {} bands".format(len(this_obj_flux)-np.sum(this_obj_islim), len(this_obj_flux)))
-    
+
     spec_file = []
     try:
       _spec_file = (catalogue['spec_file'][catind]).strip()
