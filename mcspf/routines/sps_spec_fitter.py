@@ -63,7 +63,7 @@ class sps_spec_fitter:
     def __init__(self, redshift, phot_mod_file, flux_obs, eflux_obs, filter_list, lim_obs, \
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
             fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None,
-            sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, minage=100, mintau=300, emimetal=0.0, fescrange=[0.5,2.0]):
+            sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, minage=100, mintau=300, emimetal=0.0, sigrange = [1,500.], fescrange=[0.5,2.0]):
         
         """ Class for dealing with MultiNest fitting """
         
@@ -400,21 +400,25 @@ class sps_spec_fitter:
         self.ext_lims = np.array((0, 4.))
         self.alpha_lims = np.array((self.dh_alpha[0], self.dh_alpha[-1]))
         self.mass_lims = np.array((3,12))
-        self.sig_lims = np.array((1., 500.))
+        self.sig_lims = np.array((sigrange[0], sigrange[1]))
         self.vel_lims = np.array((-250., 250.))
         self.emmsig_lims = np.array((1.,200.)) 
         self.emmage_lims = np.array((self.emm_ages.min(), 10))
         self.emmion_lims = np.array((self.emm_ions.min(), self.emm_ions.max()))
         self.fesc_lims = np.array((fescrange[0], fescrange[1]))
         self.lnf_lims = np.array((-2, 2))
+        
+        if (sigrange[0] != 1) or (sigrange[1] != 500):
+            print('      INFO: Custom stellar sigma range is: {} - {}'.format(sigrange[0], sigrange[1]))
 
+        
         self.bounds = [self.tau_lims, self.age_lims, self.av_lims, \
                 self.ext_lims, self.alpha_lims,  self.mass_lims, \
                 self.sig_lims, self.vel_lims, self.emmsig_lims, self.emmage_lims,\
                 self.emmion_lims, self.fesc_lims, self.lnf_lims, self.lnf_lims]
                 
         self.ndims = len(self.bounds)   
-    
+        
     def spec_init(self, specfile, resfile, polymax, cropspec):
 
         #so it can be used in the fit           

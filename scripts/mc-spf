@@ -45,6 +45,7 @@ grpfit.add_argument('--sampeff',   default= 0.7,   type=float, help='Sampling ef
 grpfit.add_argument('--minage',    default= 100,   type=float, help='The minimum age of the SFH in Myr. Default = 100')
 grpfit.add_argument('--mintau',    default= 300,   type=float, help='The minimum tau of the SFH in Myr. Default = 300')
 grpfit.add_argument('--fescrange', default= None,  help='Multiplicative escape fraction Default = -0.5,0.5')
+grpfit.add_argument('--sigrange',  default= None,  help='Stellar sigma range Default = 1,500')
 grpfit.add_argument('--refit',     default=False, help='If true fit also objects for which a fit already exists. Default=False.')
 
 grpplt = parser.add_argument_group('Plot related arguments')
@@ -164,6 +165,11 @@ if args.fescrange is None:
    fescrange=[-0.5,0.5]
 else:
    fescrange = np.array(args.fescrange.split(','), dtype=float)
+
+if args.sigrange is None:
+   sigrange=[1,500]
+else:
+   sigrange = np.array(args.sigrange.split(','), dtype=float)
 
 #Open filter file
 ffilt = np.loadtxt(args.filtfile, dtype=object) 
@@ -303,7 +309,7 @@ for ind in range(nobj):
                Gpriors=Gpriors, priorAext=priorAext, fit_spec=fit_spec, fit_phot=fit_phot, \
                polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
                sfh_age_par = sfh_age_par, dl=dl, minage=args.minage, \
-               mintau=args.mintau,fescrange=fescrange, emimetal=args.emimetal) as temp:
+               mintau=args.mintau,fescrange=fescrange,sigrange=sigrange,emimetal=args.emimetal) as temp:
     
           pymultinest.run(temp.lnlhood, temp._scale_cube, ndim, sampling_efficiency=args.sampeff, resume=False, \
                    outputfiles_basename=out_fmt.format(obj), verbose=True, multimodal=False, \
