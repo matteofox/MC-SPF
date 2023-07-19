@@ -42,17 +42,19 @@ grpfit = parser.add_argument_group('Fit related arguments')
 grpfit.add_argument('--nlive',     default= 500,   type=int,   help='Number of live points in the Multinest solver, default=500')
 grpfit.add_argument('--sampeff',   default= 0.7,   type=float, help='Sampling efficiency in the Multinest solver. Lower is more \
                                                                      precise and computationally expensive, default=0.7')
-grpfit.add_argument('--minage',    default= 100,   type=float, help='The minimum age of the SFH in Myr. Default = 100')
-grpfit.add_argument('--mintau',    default= 300,   type=float, help='The minimum tau of the SFH in Myr. Default = 300')
-grpfit.add_argument('--fescrange', default= None,  help='Multiplicative escape fraction Default = -0.5,0.5')
-grpfit.add_argument('--sigrange',  default= None,  help='Stellar sigma range Default = 1,500')
-grpfit.add_argument('--refit',     default=False, help='If true fit also objects for which a fit already exists. Default=False.')
+grpfit.add_argument('--sfhpar1range',    default= None,  help='SFH parameter 1 range. Default = Full range in the model grid')
+grpfit.add_argument('--sfhpar2range',    default= None,  help='SFH parameter 2 range. Default = Full range in the model grid')
+grpfit.add_argument('--fescrange',       default= None,  help='Multiplicative escape fraction Default = -0.5,0.5')
+grpfit.add_argument('--sigrange',        default= None,  help='Stellar sigma range Default = 1,500')
+grpfit.add_argument('--velrange',        default= None,  help='Stellar velocity offset range w.r.t. redshift value in input file. Default = -250,250 \
+							       Very large values could cause issues in the fit. Please use caution.')
+grpfit.add_argument('--refit',           default=False, help='If true fit also objects for which a fit already exists. Default=False.')
 
 grpplt = parser.add_argument_group('Plot related arguments')
 
 grpplt.add_argument('--sprange',   default= None,    help='Y-axis (Flux) range for spectra plots')
 grpplt.add_argument('--phrange',   default= None,    help='Y-axis (Luminosity) range for photometry plot')
-grpplt.add_argument('--agerange',  default= None,    help='X-axis (Time) range for SFH plot')
+grpplt.add_argument('--timerange',  default= None,    help='X-axis (Time) range for SFH plot')
 grpplt.add_argument('--rasterize', dest='rasterize', action='store_true', help='If set, will make smaller summary plots by rasterizing some lines.')
 
 grpout = parser.add_argument_group('Output control arguments')
@@ -167,9 +169,14 @@ else:
    fescrange = np.array(args.fescrange.split(','), dtype=float)
 
 if args.sigrange is None:
-   sigrange=[1,500]
+   sigrange=[1.,500.]
 else:
    sigrange = np.array(args.sigrange.split(','), dtype=float)
+
+if args.velrange is None:
+   velrange=[-250.,250.]
+else:
+   velrange = np.array(args.velrange.split(','), dtype=float)
 
 #Open filter file
 ffilt = np.loadtxt(args.filtfile, dtype=object) 
@@ -308,8 +315,9 @@ for ind in range(nobj):
                res_in=res_file, filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                Gpriors=Gpriors, priorAext=priorAext, fit_spec=fit_spec, fit_phot=fit_phot, \
                polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
-               sfh_age_par = sfh_age_par, dl=dl, minage=args.minage, \
-               mintau=args.mintau,fescrange=fescrange,sigrange=sigrange,emimetal=args.emimetal) as temp:
+               sfh_age_par = sfh_age_par, dl=dl, sfhpar1range=args.sfhpar1range, \
+               sfhpar2range=args.sfhpar2range,fescrange=fescrange,sigrange=sigrange,\
+               velrange=velrange,emimetal=args.emimetal) as temp:
     
           pymultinest.run(temp.lnlhood, temp._scale_cube, ndim, sampling_efficiency=args.sampeff, resume=False, \
                    outputfiles_basename=out_fmt.format(obj), verbose=True, multimodal=False, \
@@ -575,9 +583,9 @@ for ind in range(nobj):
             else:
                phrange = np.array([1e6,2e11])
 
-            if args.agerange != None:
-               agerange = np.array((args.agerange).split(','), dtype=float)
-               ax4.set_xlim(agerange)
+            if args.timerange != None:
+               timerange = np.array((args.timerange).split(','), dtype=float)
+               ax4.set_xlim(timerange)
 
             ax1.axis([phxmin, phxmax, phrange[0],phrange[1]])
             ax1.set_xlabel(r'$\lambda~\mathrm{obs.}~[\mu \mathrm{m}]$')

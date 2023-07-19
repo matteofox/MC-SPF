@@ -62,8 +62,9 @@ class sps_spec_fitter:
 
     def __init__(self, redshift, phot_mod_file, flux_obs, eflux_obs, filter_list, lim_obs, \
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
-            fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None,
-            sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, minage=100, mintau=300, emimetal=0.0, sigrange = [1,500.], fescrange=[0.5,2.0]):
+            fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None, \
+            sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, sfhpar1range = None, sfhpar2range=None, emimetal=0.0, \
+            velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.5,2.0]):
         
         """ Class for dealing with MultiNest fitting """
         
@@ -383,25 +384,30 @@ class sps_spec_fitter:
         else:
           self.n_spec = 0
        
-        #Verify validity of user requested min tau and age
-        mintau_valid = np.max((self.grid_tau.min(), mintau))
-        minage_valid = np.max((self.grid_age.min(), minage))
-        
-        #set up parameter limits
-        if sfh_pars[0]=='TAU':
-          self.tau_lims = np.array((mintau_valid, self.grid_tau.max()))
+        if sfhpar1range is None:
+            self.sfhpar1_lims = np.array((self.grid_tau.min(), self.grid_tau.max()))
         else:
-          self.tau_lims = np.array((self.grid_tau.min(), self.grid_tau.max()))
-        if sfh_pars[1]=='AGE':
-          self.age_lims = np.array((minage_valid, self.gal_age))
+            #Verify validity of user requested values
+            minval_valid = np.max((self.grid_tau.min(), sfhpar1range[0]))
+            maxval_valid = np.min((self.grid_tau.max(), sfhpar1range[1]))
+            self.sfhpar1_lims = np.array((minval_valid, maxval_valid))
+            print('      INFO: Custom SFH PAR1 range is: {} - {}'.format(self.sfhpar1_lims[0], self.sfhpar1_lims[1]))
+
+        if sfhpar2range is None:
+            self.sfhpar2_lims = np.array((self.grid_age.min(), self.grid_age.max()))
         else:
-          self.age_lims = np.array((self.grid_age.min(), self.grid_age.max()))
+            #Verify validity of user requested values
+            minval_valid = np.max((self.grid_age.min(), sfhpar2range[0]))
+            maxval_valid = np.min((self.grid_age.max(), sfhpar2range[1]))
+            self.sfhpar2_lims = np.array((minval_valid, maxval_valid))
+           print('      INFO: Custom SFH PAR2 range is: {} - {}'.format(self.sfhpar2_lims[0], self.sfhpar2_lims[1]))
+            
         self.av_lims = np.array((0., 4.))
         self.ext_lims = np.array((0, 4.))
         self.alpha_lims = np.array((self.dh_alpha[0], self.dh_alpha[-1]))
         self.mass_lims = np.array((3,12))
         self.sig_lims = np.array((sigrange[0], sigrange[1]))
-        self.vel_lims = np.array((-250., 250.))
+        self.vel_lims = np.array((velrange[0], velrange[1]))
         self.emmsig_lims = np.array((1.,200.)) 
         self.emmage_lims = np.array((self.emm_ages.min(), 10))
         self.emmion_lims = np.array((self.emm_ions.min(), self.emm_ions.max()))
@@ -411,8 +417,11 @@ class sps_spec_fitter:
         if (sigrange[0] != 1) or (sigrange[1] != 500):
             print('      INFO: Custom stellar sigma range is: {} - {}'.format(sigrange[0], sigrange[1]))
 
+       if (velrange[0] != -250) or (velrange[1] != 250):
+            print('      INFO: Custom stellar velocity range is: {} - {}'.format(velrange[0], velrange[1]))
+
         
-        self.bounds = [self.tau_lims, self.age_lims, self.av_lims, \
+        self.bounds = [self.sfhpar1_lims, self.sfhpar2_lims, self.av_lims, \
                 self.ext_lims, self.alpha_lims,  self.mass_lims, \
                 self.sig_lims, self.vel_lims, self.emmsig_lims, self.emmage_lims,\
                 self.emmion_lims, self.fesc_lims, self.lnf_lims, self.lnf_lims]
