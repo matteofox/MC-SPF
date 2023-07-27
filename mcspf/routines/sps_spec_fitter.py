@@ -402,8 +402,8 @@ class sps_spec_fitter:
             self.sfhpar2_lims = np.array((minval_valid, maxval_valid))
            print('      INFO: Custom SFH PAR2 range is: {} - {}'.format(self.sfhpar2_lims[0], self.sfhpar2_lims[1]))
             
-        self.av_lims = np.array((0., 4.))
-        self.ext_lims = np.array((0, 4.))
+        self.av_lims  = np.array((0., 5.))
+        self.ext_lims = np.array((0., 5.))
         self.alpha_lims = np.array((self.dh_alpha[0], self.dh_alpha[-1]))
         self.mass_lims = np.array((3,12))
         self.sig_lims = np.array((sigrange[0], sigrange[1]))
