@@ -400,7 +400,7 @@ class sps_spec_fitter:
             minval_valid = np.max((self.grid_age.min(), sfhpar2range[0]))
             maxval_valid = np.min((self.grid_age.max(), sfhpar2range[1]))
             self.sfhpar2_lims = np.array((minval_valid, maxval_valid))
-           print('      INFO: Custom SFH PAR2 range is: {} - {}'.format(self.sfhpar2_lims[0], self.sfhpar2_lims[1]))
+            print('      INFO: Custom SFH PAR2 range is: {} - {}'.format(self.sfhpar2_lims[0], self.sfhpar2_lims[1]))
             
         self.av_lims  = np.array((0., 5.))
         self.ext_lims = np.array((0., 5.))
