@@ -5,7 +5,6 @@ import astropy.io.fits as fits
 import astropy.io.ascii as ascii
 import astropy.table as table
 import glob, os, sys
-import pymultinest
 import argparse
 import matplotlib.pyplot as pl
 from matplotlib.ticker import MultipleLocator
@@ -39,6 +38,7 @@ grpinp.add_argument('--emimetal',  default= 0.02,  type=float, help='Emission li
 
 grpfit = parser.add_argument_group('Fit related arguments')
 
+grpfit.add_argument('--solver',    default= 'multinest',  help='The Nested Sampling code to be used to traverse the parameter space. Default=multinest. Other Option=ultranest')
 grpfit.add_argument('--nlive',     default= 500,   type=int,   help='Number of live points in the Multinest solver, default=500')
 grpfit.add_argument('--sampeff',   default= 0.7,   type=float, help='Sampling efficiency in the Multinest solver. Lower is more \
                                                                      precise and computationally expensive, default=0.7')
@@ -319,11 +319,24 @@ for ind in range(nobj):
                sfhpar2range=args.sfhpar2range,fescrange=fescrange,sigrange=sigrange,\
                velrange=velrange,emimetal=args.emimetal) as temp:
     
-          pymultinest.run(temp.lnlhood, temp._scale_cube, ndim, sampling_efficiency=args.sampeff, resume=False, \
-                   outputfiles_basename=out_fmt.format(obj), verbose=True, multimodal=False, \
-                   importance_nested_sampling=False, n_live_points=args.nlive, n_iter_before_update=500, \
-                   evidence_tolerance=0.5)
+          
+          if args.solver == 'ultranest':
+            import ultranest            
+            solver = ultranest.integrator.ReactiveNestedSampler(parameters, temp.lnlhood_un, transform=temp._scale_cube_un, vectorized=False)# \
+                    # log_dir=os.path.dirname(out_fmt.format(obj)))
+            solver.run(min_num_live_points=args.nlive,dlogz=0.5)
 
+          elif args.solver =='multinest':
+            import pymultinest
+            pymultinest.run(temp.lnlhood_mn, temp._scale_cube_mn, ndim, sampling_efficiency=args.sampeff, resume=False, \
+                    outputfiles_basename=out_fmt.format(obj), verbose=True, multimodal=False, \
+                    importance_nested_sampling=False, n_live_points=args.nlive, n_iter_before_update=500, \
+                    evidence_tolerance=0.5)
+          else:
+            print("ERROR: Solver not understood or not implemented. Aborting...")
+            exit()
+
+          
           if not args.fullout:
              try:
                os.remove('{0}ev.dat'.format(out_fmt.format(obj)))

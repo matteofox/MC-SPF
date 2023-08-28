@@ -400,7 +400,7 @@ class sps_spec_fitter:
             minval_valid = np.max((self.grid_age.min(), sfhpar2range[0]))
             maxval_valid = np.min((self.grid_age.max(), sfhpar2range[1]))
             self.sfhpar2_lims = np.array((minval_valid, maxval_valid))
-           print('      INFO: Custom SFH PAR2 range is: {} - {}'.format(self.sfhpar2_lims[0], self.sfhpar2_lims[1]))
+            print('      INFO: Custom SFH PAR2 range is: {} - {}'.format(self.sfhpar2_lims[0], self.sfhpar2_lims[1]))
             
         self.av_lims  = np.array((0., 5.))
         self.ext_lims = np.array((0., 5.))
@@ -417,7 +417,7 @@ class sps_spec_fitter:
         if (sigrange[0] != 1) or (sigrange[1] != 500):
             print('      INFO: Custom stellar sigma range is: {} - {}'.format(sigrange[0], sigrange[1]))
 
-       if (velrange[0] != -250) or (velrange[1] != 250):
+        if (velrange[0] != -250) or (velrange[1] != 250):
             print('      INFO: Custom stellar velocity range is: {} - {}'.format(velrange[0], velrange[1]))
 
         
@@ -604,11 +604,19 @@ class sps_spec_fitter:
         
         return linLam*fact
     
-    def _scale_cube(self, cube, ndims, nparams):
+    #This should be used with MultiNest 
+    def _scale_cube_mn(self, cube, ndims, nparams):
         for ii in range(ndims):
             cube[ii] = cube[ii]*self.bounds[ii].ptp() + np.min(self.bounds[ii])
 
         return
+    
+    #This should be used with UltraNest
+    def _scale_cube_un(self, cube):
+        sc_cube = np.copy(cube)
+        for ii in range(self.ndims):
+            sc_cube[ii] = sc_cube[ii]*self.bounds[ii].ptp() + np.min(self.bounds[ii])
+        return sc_cube
 
     def _losvd_rfft(self, vel, sigma, spid):
         """Generate analytic fourier transform of the LOSVD following Cappellari et al. 2016 and pPXF,
@@ -797,7 +805,7 @@ class sps_spec_fitter:
 
         return -np.inf
 
-    def lnlhood(self, p, ndim, nparams):
+    def lnlhood_worker(self, p):
         
         spec_lhood = 0
         phot_lhood = 0
@@ -805,7 +813,7 @@ class sps_spec_fitter:
         if self.fit_spec == True:
           
           for ss in range(self.n_spec):
-            model_spec = self.reconstruct_spec(p, ndim, ss)
+            model_spec = self.reconstruct_spec(p, self.ndims, ss)
         
             if np.all(model_spec == 0.):
                 return -np.inf
@@ -815,7 +823,7 @@ class sps_spec_fitter:
             spec_lhood += -0.5*np.nansum((ispec2*(self.log_obj[ss]-model_spec)**2 - np.log(ispec2) + np.log(2.*np.pi))[self.goodpix_spec[ss]])
                   
            
-        model_phot, _ = self.reconstruct_phot(p, ndim)
+        model_phot, _ = self.reconstruct_phot(p, self.ndims)
          
         if np.all(model_phot == 0.) or np.any(~np.isfinite(model_phot)):
            return -np.inf
@@ -834,12 +842,27 @@ class sps_spec_fitter:
              phot_lhood = -0.5*np.nansum(((iphot2*(self.flux_obs-model_phot)**2) - np.log(iphot2) + np.log(2.*np.pi)))
         
         #### APPLY THE PRIOR HERE  #####
-        pr = self.lnprior(p, ndim)
+        pr = self.lnprior(p, self.ndims)
         
         if not np.isfinite(pr):
             return -np.inf
         
         return spec_lhood + phot_lhood + pr
+    
+    #This should be used with Multinest
+    def lnlhood_mn(self, p, ndim, nparams):
+        
+        return self.lnlhood_worker(p)
+    
+    #This should be used with UltraNest    
+    def lnlhood_un(self, p):
+        
+        val = self.lnlhood_worker(p)
+        if np.isfinite(val):
+          return val
+        else:
+         return -1e70  
+        
 
         
     def _get_clyman(self, spec, fesc): #compute number of Lyman continuum photons
