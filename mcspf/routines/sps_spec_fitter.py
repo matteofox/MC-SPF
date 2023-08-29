@@ -417,7 +417,7 @@ class sps_spec_fitter:
         if (sigrange[0] != 1) or (sigrange[1] != 500):
             print('      INFO: Custom stellar sigma range is: {} - {}'.format(sigrange[0], sigrange[1]))
 
-       if (velrange[0] != -250) or (velrange[1] != 250):
+        if (velrange[0] != -250) or (velrange[1] != 250):
             print('      INFO: Custom stellar velocity range is: {} - {}'.format(velrange[0], velrange[1]))
 
         
