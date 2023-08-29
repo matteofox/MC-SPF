@@ -4,7 +4,7 @@ cimport numpy as np
 import cython
 from libc.math cimport fabs
 
-ctypedef np.float_t DTYPE_t
+ctypedef double DTYPE_t
 
 __all__ = ["getmag_spec"]
 

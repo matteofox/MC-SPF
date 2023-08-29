@@ -130,7 +130,7 @@ if __name__ == "__main__":
           'matplotlib',
           'mpi4py',
           'astropy',
-	  'pymultinest',
+	  'ultranest',
 	  'corner'],
         package_data={"": ["README.md", "LICENSE"],
 	              "mcspf": ["models/Dust_Emi_models/alpha_DH02.dat",

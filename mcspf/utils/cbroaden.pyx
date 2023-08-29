@@ -4,8 +4,8 @@ cimport numpy as n
 from cpython cimport bool
 
 DTYPE = float
-ctypedef n.float_t DTYPE_t
-ctypedef n.int_t DTYPE_i
+ctypedef double DTYPE_t
+ctypedef long DTYPE_i
 
 def broaden(n.ndarray[DTYPE_t, ndim=1] flux, n.ndarray[DTYPE_t, ndim=1] sigma, bool variance=False ):
     #sigma should be the broadening in pixels to apply for each pixel, should have the same length as flux/wl
@@ -25,7 +25,7 @@ def broaden(n.ndarray[DTYPE_t, ndim=1] flux, n.ndarray[DTYPE_t, ndim=1] sigma, b
         for pix in range(N_elem):
             if width[pix]/2.355 < 1.0:
                 out_spec[pix] = flux[pix]
-                ttpix[pix] = norm_spec[pix]
+                ttpix[pix] = norm_spec[pix] 
             else:
                 if pix+1 < width[pix]:
                     for npix in range(0-pix,spix[pix]):

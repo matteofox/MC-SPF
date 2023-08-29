@@ -4,8 +4,8 @@ cimport numpy as np
 import cython
 from libc.math cimport sin, floor, ceil, exp, pow, M_PI
 
-ctypedef np.float_t DTYPE_t
-ctypedef np.int_t iDTYPE_t
+ctypedef double DTYPE_t
+ctypedef long iDTYPE_t
 
 __all__ = ["sincrebin_single", "sincrebin_single_os"]
 
@@ -173,7 +173,7 @@ cpdef np.ndarray[DTYPE_t, ndim=1] sincrebin_single(double[:] sci_wl, double[:] s
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
-cpdef np.ndarray[DTYPE_t, ndim=1] sincrebin_single_os(double[:] sky_wl, double[:] sci_wl, double[:] sci_flux):
+cpdef np.ndarray[DTYPE_t, ndim=1] sincrebin_single_os(DTYPE_t[:] sky_wl, DTYPE_t[:] sci_wl, DTYPE_t[:] sci_flux):
     """modified slightly to deal with the oversampling case""" 
     #parameters for the sinc kernel
     cdef double SINCRAD = 4.0
