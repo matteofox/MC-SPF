@@ -188,6 +188,17 @@ if args.velrange is None:
 else:
    velrange = np.array(args.velrange.split(','), dtype=float)
 
+if args.sfhpar1range is None:
+   sfhpar1range = None
+else:
+   sfhpar1range = np.array(args.sfhpar1range.split(','), dtype=float)
+
+if args.sfhpar2range is None:
+   sfhpar2range = None
+else:
+   sfhpar2range = np.array(args.sfhpar2range.split(','), dtype=float)
+
+
 #Open filter file
 ffilt = np.loadtxt(args.filtfile, dtype=object) 
 fsps_filt = dict(zip(ffilt[:,0], ffilt[:,1]))
@@ -325,8 +336,8 @@ for ind in range(nobj):
                res_in=res_file, filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                Gpriors=Gpriors, priorAext=priorAext, fit_spec=fit_spec, fit_phot=fit_phot, \
                polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
-               sfh_age_par = sfh_age_par, dl=dl, sfhpar1range=args.sfhpar1range, \
-               sfhpar2range=args.sfhpar2range,fescrange=fescrange,sigrange=sigrange,\
+               sfh_age_par = sfh_age_par, dl=dl, sfhpar1range=sfhpar1range, \
+               sfhpar2range=sfhpar2range,fescrange=fescrange,sigrange=sigrange,\
                velrange=velrange,emimetal=args.emimetal) as temp:
     
           

@@ -240,7 +240,7 @@ class sps_spec_fitter:
             self.sps_res_val[(self.wl >= 3540) & (self.wl <= 7350)] = 2.5
             self.sps_res_val[(self.wl >= 7350) & (self.wl <= 9400)] = 1.
         else: 
-            print('WARNING: Spectral library unknown, BC03 resolution will be used for spectral fits.')
+            print('WARNING: Spectral library {} not understood, BC03 resolution will be used for spectral fits.'.format(self.mod_lib))
             self.sps_res_val = np.copy(self.wl)/300.
             self.sps_res_val[(self.wl >= 3200) & (self.wl <= 9500)] = 3.
 
@@ -383,24 +383,38 @@ class sps_spec_fitter:
 
         else:
           self.n_spec = 0
-       
+        
         if sfhpar1range is None:
-            self.sfhpar1_lims = np.array((self.grid_tau.min(), self.grid_tau.max()))
+            if sfh_pars[0].upper() =='AGE':
+              maxval_valid = np.min((self.grid_tau.max(), self.gal_age))
+            else:
+              maxval_valid = self.grid_tau.max()
+            self.sfhpar1_lims = np.array((self.grid_tau.min(), maxval_valid))
         else:
             #Verify validity of user requested values
             minval_valid = np.max((self.grid_tau.min(), sfhpar1range[0]))
-            maxval_valid = np.min((self.grid_tau.max(), sfhpar1range[1]))
+            if sfh_pars[0].upper() =='AGE':
+              maxval_valid = np.min((self.grid_tau.max(), sfhpar1range[1], self.gal_age))
+            else:
+              maxval_valid = np.min((self.grid_tau.max(), sfhpar1range[1]))
             self.sfhpar1_lims = np.array((minval_valid, maxval_valid))
-            print('      INFO: Custom SFH PAR1 range is: {} - {}'.format(self.sfhpar1_lims[0], self.sfhpar1_lims[1]))
+        print('      INFO: SFH PAR1 range is: {:.1f} - {:.1f}'.format(self.sfhpar1_lims[0], self.sfhpar1_lims[1]))
 
         if sfhpar2range is None:
-            self.sfhpar2_lims = np.array((self.grid_age.min(), self.grid_age.max()))
+            if sfh_pars[1].upper() =='AGE':
+              maxval_valid = np.min((self.grid_tau.max(), self.gal_age))
+            else:
+              maxval_valid = self.grid_tau.max()
+            self.sfhpar2_lims = np.array((self.grid_age.min(), maxval_valid))
         else:
             #Verify validity of user requested values
             minval_valid = np.max((self.grid_age.min(), sfhpar2range[0]))
-            maxval_valid = np.min((self.grid_age.max(), sfhpar2range[1]))
+            if sfh_pars[1].upper() =='AGE':
+              maxval_valid = np.min((self.grid_age.max(), sfhpar2range[1], self.gal_age))
+            else:
+              maxval_valid = np.min((self.grid_age.max(), sfhpar2range[1]))
             self.sfhpar2_lims = np.array((minval_valid, maxval_valid))
-            print('      INFO: Custom SFH PAR2 range is: {} - {}'.format(self.sfhpar2_lims[0], self.sfhpar2_lims[1]))
+        print('      INFO: SFH PAR2 range is: {:.1f} - {:.1f}'.format(self.sfhpar2_lims[0], self.sfhpar2_lims[1]))
             
         self.av_lims  = np.array((0., 5.))
         self.ext_lims = np.array((0., 5.))
