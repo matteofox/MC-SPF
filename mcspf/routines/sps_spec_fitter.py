@@ -275,7 +275,7 @@ class sps_spec_fitter:
         metind = np.argmin(np.abs(metallist-self.emimetal))
         print('      INFO: Emission line metallicity requested {}, found {:5.4f}'.format(self.emimetal,metallist[metind]))
         
-        with open(modeldir+'nebular_Byler.lines','r') as file:
+        with open(modeldir+'nebular_Byler_mist_2018.lines','r') as file:
             for line in file:
                 if line[0] != '#':
                     temp = (line.strip()).split(None)
