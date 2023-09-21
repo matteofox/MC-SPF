@@ -260,22 +260,32 @@ class sps_spec_fitter:
         self.lycont_wls = np.r_[self.wl[:self.ilyman], np.array([self.wl_lyman])]
         self.clyman_young = None #A list of two elements, first is for phot, the other for spec
         self.clyman_old   = None #A list of two elements, first is for phot, the other for spec
-
-        self.emm_scales = np.zeros((7,10,128), dtype=float)
-        self.emm_wls    = np.zeros(128,        dtype=float)
-        self.emm_ages   = np.zeros(10,         dtype=float)
-        self.emm_ions   = np.zeros(7,         dtype=float)
+        
+        emimodel = '2018'
+        if emimodel == '2018':
+         byler_bins = [382,9,7]
+         byler_fname = 'nebular_Byler_mist_2018.lines'
+         metallist = np.array([6.3245e-05,2.0000e-04,3.5565e-04,6.3245e-04,1.1246e-03,2.0000e-03,3.5565e-03,6.3245e-03,1.1246e-02,2.000e-02,3.5565e-02,6.3245e-02])
+         metalstrg = np.array(['-2.5000e+00','-2.0000e+00','-1.7500e+00','-1.5000e-00','-1.2500e-00','-1.0000e-00','-7.5000e-01','-5.0000e-01','-2.5000e+00','0.0000e+00','2.5000e-01','5.0000e-01'])
+        else:
+         byler_bins = [128,10,7]
+         byler_fname = 'nebular_Byler_mist_2017.lines'
+         metallist = np.array([0.00020,0.00063246,0.00209426,0.00526054,0.00814761,0.01002374,0.01261915,0.01588656,0.02,0.02517851,0.03169786])
+         metalstrg = np.array(['-1.9800e+00','-1.5000e+00','-9.8000e-01','-5.8000e-01','-3.9000e-01','-3.0000e-01','-2.0000e-01','-1.0000e-01','0.0000e+00','1.0000e-01','2.0000e-01'])
+        
+        self.emm_scales = np.zeros((byler_bins[2],byler_bins[1],byler_bins[0]), dtype=float)
+        self.emm_wls    = np.zeros(byler_bins[0],        dtype=float)
+        self.emm_ages   = np.zeros(byler_bins[1],        dtype=float)
+        self.emm_ions   = np.zeros(byler_bins[2],        dtype=float)
         icnt = 0
         rline = 0
         iline = 0
         
-        metallist = np.array([0.00020,0.00063246,0.00209426,0.00526054,0.00814761,0.01002374,0.01261915,0.01588656,0.02,0.02517851,0.03169786])
-        metalstrg = np.array(['-1.0000e-01','-1.5000e+00','-1.9800e+00','-2.0000e-01','-3.0000e-01','-3.9000e-01','-5.8000e-01','-9.8000e-01','0.0000e+00','1.0000e-01','2.0000e-01'])
-        
+      
         metind = np.argmin(np.abs(metallist-self.emimetal))
         print('      INFO: Emission line metallicity requested {}, found {:5.4f}'.format(self.emimetal,metallist[metind]))
         
-        with open(modeldir+'nebular_Byler_mist_2018.lines','r') as file:
+        with open(modeldir+byler_fname,'r') as file:
             for line in file:
                 if line[0] != '#':
                     temp = (line.strip()).split(None)
@@ -561,8 +571,8 @@ class sps_spec_fitter:
         log_emm_wls = self.emm_wls[log_emm_use] *(1+self.redshift)
         log_emm_scales = self.emm_scales[:,:,log_emm_use]
         
-        tha = np.where((log_emm_wls/(1+self.redshift) > 6560) & (log_emm_wls/(1+self.redshift) < 6565))
-        thb = np.where((log_emm_wls/(1+self.redshift) > 4858) & (log_emm_wls/(1+self.redshift) < 4864))
+        #tha = np.where((log_emm_wls/(1+self.redshift) > 6560) & (log_emm_wls/(1+self.redshift) < 6565))
+        #thb = np.where((log_emm_wls/(1+self.redshift) > 4858) & (log_emm_wls/(1+self.redshift) < 4864))
         #print tha, thb
         
         diff_pix = (log_model_wl_edges[None,:] - np.log10(log_emm_wls)[:,None])/dlam_log #in pixels
@@ -908,6 +918,10 @@ class sps_spec_fitter:
         sigma_pix = np.sqrt(sigma**2+obs_kms**2)/self.kms2pix[spid]
 
         temp_emm_scales = self._bi_interp(self.log_emm_scales[spid], emm_ion, emm_age, self.emm_ions, self.emm_ages) 
+        
+        #t1 = np.where((self.log_emm_wls[spid]/(1+self.redshift) > 1215.5) & (self.log_emm_wls[spid]/(1+self.redshift) < 1215.9))
+        #t2 = np.where((self.log_emm_wls[spid]/(1+self.redshift) > 1402) & (self.log_emm_wls[spid]/(1+self.redshift) < 1404))
+        #print(t1, t2, temp_emm_scales[t1], temp_emm_scales[t2])
                 
         emm_grid = np.sum(temp_emm_scales[:,None]*\
                 np.diff(0.5*(1.+erf((self.diff_pix[spid]-vel_pix)[:,:self.npix_obj[spid]+1]/np.sqrt(2.)/sigma_pix)), axis=1)/\
