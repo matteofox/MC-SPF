@@ -63,7 +63,7 @@ class sps_spec_fitter:
     def __init__(self, redshift, phot_mod_file, flux_obs, eflux_obs, filter_list, lim_obs, \
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
             fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None, \
-            sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, sfhpar1range = None, sfhpar2range=None, emimetal=0.0, \
+            sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, sfhpar1range = None, sfhpar2range=None, emimodel='2018', emimetal=0.0, \
             velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.5,2.0]):
         
         """ Class for dealing with MultiNest fitting """
@@ -261,8 +261,9 @@ class sps_spec_fitter:
         self.clyman_young = None #A list of two elements, first is for phot, the other for spec
         self.clyman_old   = None #A list of two elements, first is for phot, the other for spec
         
-        emimodel = '2018'
-        if emimodel == '2018':
+        self.emimodel = emimodel
+        
+        if self.emimodel == '2018':
          byler_bins = [382,9,7]
          byler_fname = 'nebular_Byler_mist_2018.lines'
          metallist = np.array([6.3245e-05,2.0000e-04,3.5565e-04,6.3245e-04,1.1246e-03,2.0000e-03,3.5565e-03,6.3245e-03,1.1246e-02,2.000e-02,3.5565e-02,6.3245e-02])
@@ -412,9 +413,9 @@ class sps_spec_fitter:
 
         if sfhpar2range is None:
             if sfh_pars[1].upper() =='AGE':
-              maxval_valid = np.min((self.grid_tau.max(), self.gal_age))
+              maxval_valid = np.min((self.grid_age.max(), self.gal_age))
             else:
-              maxval_valid = self.grid_tau.max()
+              maxval_valid = self.grid_age.max()
             self.sfhpar2_lims = np.array((self.grid_age.min(), maxval_valid))
         else:
             #Verify validity of user requested values
@@ -838,7 +839,7 @@ class sps_spec_fitter:
           
           for ss in range(self.n_spec):
             model_spec = self.reconstruct_spec(p, self.ndims, ss)
-        
+            
             if np.all(model_spec == 0.):
                 return -np.inf
 
