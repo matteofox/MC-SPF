@@ -5,7 +5,7 @@ import astropy.io.fits as fits
 import astropy.io.ascii as ascii
 import astropy.table as table
 import glob, os, sys
-import argparse
+import argparse, textwrap
 import matplotlib.pyplot as pl
 from matplotlib.ticker import MultipleLocator, ScalarFormatter, StrMethodFormatter
 from scipy.interpolate import interp1d
@@ -23,7 +23,18 @@ pl.rc('text', usetex=True)
 
 cosmo=FlatLambdaCDM(H0=70,Om0=0.3)
 
-parser = argparse.ArgumentParser(description='MonteCarlo Stellar Population Fitting Code')
+parser = argparse.ArgumentParser(
+
+formatter_class=argparse.RawDescriptionHelpFormatter,
+description=textwrap.dedent('''\
+MonteCarlo Stellar Population Fitting Code
+--------------------------------
+Authors: Matteo Fossati, J.T. Mendel
+Email: matteo.fossati@unimib.it
+
+NOTE: Spectra are fit in vacuum. Please ensure input 
+spectra are in vacuum wavelengths.
+'''))
 
 grpinp = parser.add_argument_group('Input control arguments')
 
@@ -35,7 +46,7 @@ grpinp.add_argument('--sfh',       default= 'exp', help='The form of the SFH, al
                                                          for delayed tau models, or a fits file for custom made sfhs default=exp')
 grpinp.add_argument('--funit',     default= 'mJy', help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy')
 grpinp.add_argument('--emimetal',  default= 0.02,  type=float, help='Emission line metallicity Default = 0.02 (Solar value)')
-grpinp.add_argument('--emimodel',  default= '2018',  help="Emission line CLOUDY table (can only be '2017' or '2018') ")
+grpinp.add_argument('--emimodel',  default= '2017',  help="Emission line CLOUDY table (can only be '2017' or '2018') ")
 
 grpfit = parser.add_argument_group('Fit related arguments')
 
@@ -412,7 +423,7 @@ for ind in range(nobj):
               ax1.set_xscale('log')
               ax1.set_yscale('log')
               ax1.xaxis.set_major_formatter(StrMethodFormatter(r'${x:.1f}$'))
-              ax1.xaxis.set_minor_formatter(StrMethodFormatter(r'${x:.1f}$'))
+              #ax1.xaxis.set_minor_formatter(StrMethodFormatter(r'${x:.1f}$'))
                             
               #SFH and corner plot
               ax4 = fig.add_axes([0.51,0.08,0.25,0.35])

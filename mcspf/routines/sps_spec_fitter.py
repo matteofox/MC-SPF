@@ -263,11 +263,13 @@ class sps_spec_fitter:
         
         self.emimodel = emimodel
         
+        #NOTE: Emission line wavelengths have to be in VACUUM
+        
         if self.emimodel == '2018':
          byler_bins = [382,9,7]
          byler_fname = 'nebular_Byler_mist_2018.lines'
          metallist = np.array([6.3245e-05,2.0000e-04,3.5565e-04,6.3245e-04,1.1246e-03,2.0000e-03,3.5565e-03,6.3245e-03,1.1246e-02,2.000e-02,3.5565e-02,6.3245e-02])
-         metalstrg = np.array(['-2.5000e+00','-2.0000e+00','-1.7500e+00','-1.5000e-00','-1.2500e-00','-1.0000e-00','-7.5000e-01','-5.0000e-01','-2.5000e+00','0.0000e+00','2.5000e-01','5.0000e-01'])
+         metalstrg = np.array(['-2.5000e+00','-2.0000e+00','-1.7500e+00','-1.5000e+00','-1.2500e+00','-1.0000e+00','-7.5000e-01','-5.0000e-01','-2.5000e-01','0.0000e+00','2.5000e-01','5.0000e-01'])
         else:
          byler_bins = [128,10,7]
          byler_fname = 'nebular_Byler_mist_2017.lines'
