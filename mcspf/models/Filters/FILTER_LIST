@@ -57,147 +57,148 @@
 57      Spitzer IRAC 4 (8.0um)
 58      ISAAC Ks
 59      FORS U
-60      FORS V
-61      FORS R
-62      HST NICMOS F110W
-63      HST NICMOS F160W
-64      GALEX FUV
-65      GALEX NUV
-66      DES g (from Huan Lin, for DES camera)
-67      DES r (from Huan Lin, for DES camera)
-68      DES i (from Huan Lin, for DES camera)
-69      DES z (from Huan Lin, for DES camera)
-70      DES Y (from Huan Lin, for DES camera)
-71      WFCAM  Z (UKIRT from Hewett et al. 2006, via A. Smith)
-72      WFCAM  Y (UKIRT from Hewett et al. 2006, via A. Smith)
-73      WFCAM  J (UKIRT from Hewett et al. 2006, via A. Smith)
-74      WFCAM  H (UKIRT from Hewett et al. 2006, via A. Smith)
-75      WFCAM  K (UKIRT from Hewett et al. 2006, via A. Smith)
-76      Steidel Un (via A. Shapley; see Steidel et al. 2003)
-77      Steidel G  (via A. Shapley; see Steidel et al. 2003)
-78      Steidel Rs (via A. Shapley; see Steidel et al. 2003)
-79      Steidel I  (via A. Shapley; see Steidel et al. 2003)
-80      CFHT MegaCam uS (cadcwww.dao.nrc.ca/megapipe/docs/filters.html, Dec 2010)
-81      CFHT MegaCam gS (cadcwww.dao.nrc.ca/megapipe/docs/filters.html, Dec 2010)
-82      CFHT MegaCam rS (cadcwww.dao.nrc.ca/megapipe/docs/filters.html, Dec 2010)
-83      CFHT MegaCam iS (cadcwww.dao.nrc.ca/megapipe/docs/filters.html, Dec 2010)
-84      CFHT MegaCam zS (cadcwww.dao.nrc.ca/megapipe/docs/filters.html, Dec 2010)
-85      WISE W1 (3.4um http://www.astro.ucla.edu/~wright/WISE/passbands.html)
-86      WISE W2 (4.6um http://www.astro.ucla.edu/~wright/WISE/passbands.html)
-87      WISE W3 (12um http://www.astro.ucla.edu/~wright/WISE/passbands.html)
-88      WISE W4 (22um http://www.astro.ucla.edu/~wright/WISE/passbands.html)
-89      UVOT W2 (from Erik Hoversten, 2011)
-90      UVOT M2 (from Erik Hoversten, 2011)
-91      UVOT W1 (from Erik Hoversten, 2011)
-92      Spitzer MIPS 24um
-93      Spitzer MIPS 70um
-94      Spitzer MIPS 160um
-95      SCUBA 450WB (www.jach.hawaii.edu/JCMT/continuum/background/background.html)
-96      SCUBA 850WB (www.jach.hawaii.edu/JCMT/continuum/background/background.html)
-97      Herschel PACS 70um
-98      Herschel PACS 100um
-99      Herschel PACS 160um
-100     Herschel SPIRE 250um
-101     Herschel SPIRE 350um
-102     Herschel SPIRE 500um
-103     IRAS 12um
-104     IRAS 25um
-105     IRAS 60um
-106     IRAS 100um
-107     Bessell L   (Bessell & Brett 1988)
-108     Bessell L'  (Bessell & Brett 1988)
-109     Bessell M   (Bessell & Brett 1988)
-110     Stromgren u (Bessell 2011)
-111     Stromgren v (Bessell 2011)
-112     Stromgren b (Bessell 2011)
-113     Stromgren y (Bessell 2011)
-114     Idealized 1500A  (15% bandwidth, FWHM = 225A from M. Dickinson)
-115     Idealized 2300A  (15% bandwidth, FWHM = 345A from M. Dickinson)
-116     Idealized 2800A  (15% bandwidth, FWHM = 420A from M. Dickinson)
-117     JWST F070W 
-118     JWST F090W 
-119     JWST F115W 
-120     JWST F150W 
-121     JWST F200W 
-122     JWST F277W 
-123     JWST F356W 
-124     JWST F444W 
-125     JWST F150W2
-126     JWST F322W2
-127     CFHT WIRCAM J
-128     CFHT WIRCAM Ks
-129     VISTA Y
-130     VISTA J
-131     VISTA H
-132     VISTA K
-133     ISAAC Js
-134     ISAAC H
-135     NMBS J1
-136     NMBS J2
-137     NMBS J3
-138     NMBS H1
-139     NMBS H2
-140     NMBS Ks
-141     Subaru SuprimeCam IA427
-142     Subaru SuprimeCam IA445
-143     Subaru SuprimeCam IA464
-144     Subaru SuprimeCam IA484
-145     Subaru SuprimeCam IA505
-146     Subaru SuprimeCam IA527
-147     Subaru SuprimeCam IA550
-148     Subaru SuprimeCam IA574
-149     Subaru SuprimeCam IA598
-150     Subaru SuprimeCam IA624
-151     Subaru SuprimeCam IA651
-152     Subaru SuprimeCam IA679
-153     Subaru SuprimeCam IA709
-154     Subaru SuprimeCam IA738
-155     Subaru SuprimeCam IA767
-156     Subaru SuprimeCam IA797
-157     Subaru SuprimeCam IA827
-158     Subaru SuprimeCam IA856
-159     Subaru SuprimeCam IA907
-160     VIMOS U
-161     VIMOS R
-162     Subaru Bj
-163     Subaru Vj
-164     Subaru r+
-165     Subaru i+
-166     Subaru z+
-167     WFI U38
-168     WFI B99
-169     WFI V
-170     WFI Rc
-171     WFI Ic
-172     CFHT WIRCAM H
-173     WFI I EIS
-174     CAPAK Subaru B (cosmos-b) 
-175     CAPAK Subaru V (cosmos-v) 
-176     CAPAK Subaru r (cosmos-r) 
-177     CAPAK Subaru i (cosmos-i) 
-178     CAPAK Subaru z (cosmos-z) 
-179     LRIS g blue
-180     LRIS Rs red
-181     MOIRCS J
-182     MOIRCS H
-183     MOIRCS K
-184     MOSAIC U
-185     maiz U
-186     maiz B
-187     maiz V
-188     VISTA Z
-189     CFHT Megacam r  (New filter from 2014, curve made by M.Fossati)
-190     CFHT Megacam Ha (New filter from 2015, curve made by M.Fossati)
-191     MUSE BLUE  (tophat)
-192	MUSE GREEN (tophat)
-193     MUSE RED   (tophat)
-194     MUSE NIR   (tophat)
-195     MUSE WHITE AOE (from muse manual)
-196     UVIT FUV F154W (UVIT FUV Filter, in-orbit calib. July 2017 (A. Subramaniam))
-197     HAWKI H
-198     HAWKI CH4
-199	HAWKI Ks (from eso website)
-200	JWST MIRI F770W
-201	JWST MIRI F1000W
-202	JWST MIRI F1280W
-203	JWST MIRI F1800W
+60      FORS B
+61      FORS V
+62      FORS R
+63      HST NICMOS F110W
+64      HST NICMOS F160W
+65      GALEX FUV
+66      GALEX NUV
+67      DES g (from Huan Lin, for DES camera)
+68      DES r (from Huan Lin, for DES camera)
+69      DES i (from Huan Lin, for DES camera)
+70      DES z (from Huan Lin, for DES camera)
+71      DES Y (from Huan Lin, for DES camera)
+72      WFCAM  Z (UKIRT from Hewett et al. 2006, via A. Smith)
+73      WFCAM  Y (UKIRT from Hewett et al. 2006, via A. Smith)
+74      WFCAM  J (UKIRT from Hewett et al. 2006, via A. Smith)
+75      WFCAM  H (UKIRT from Hewett et al. 2006, via A. Smith)
+76      WFCAM  K (UKIRT from Hewett et al. 2006, via A. Smith)
+77      Steidel Un (via A. Shapley; see Steidel et al. 2003)
+78      Steidel G  (via A. Shapley; see Steidel et al. 2003)
+79      Steidel Rs (via A. Shapley; see Steidel et al. 2003)
+80      Steidel I  (via A. Shapley; see Steidel et al. 2003)
+81      CFHT MegaCam uS (cadcwww.dao.nrc.ca/megapipe/docs/filters.html, Dec 2010)
+82      CFHT MegaCam gS (cadcwww.dao.nrc.ca/megapipe/docs/filters.html, Dec 2010)
+83      CFHT MegaCam rS (cadcwww.dao.nrc.ca/megapipe/docs/filters.html, Dec 2010)
+84      CFHT MegaCam iS (cadcwww.dao.nrc.ca/megapipe/docs/filters.html, Dec 2010)
+85      CFHT MegaCam zS (cadcwww.dao.nrc.ca/megapipe/docs/filters.html, Dec 2010)
+86      WISE W1 (3.4um http://www.astro.ucla.edu/~wright/WISE/passbands.html)
+87      WISE W2 (4.6um http://www.astro.ucla.edu/~wright/WISE/passbands.html)
+88      WISE W3 (12um http://www.astro.ucla.edu/~wright/WISE/passbands.html)
+89      WISE W4 (22um http://www.astro.ucla.edu/~wright/WISE/passbands.html)
+90      UVOT W2 (from Erik Hoversten, 2011)
+91      UVOT M2 (from Erik Hoversten, 2011)
+92      UVOT W1 (from Erik Hoversten, 2011)
+93      Spitzer MIPS 24um
+94      Spitzer MIPS 70um
+95      Spitzer MIPS 160um
+96      SCUBA 450WB (www.jach.hawaii.edu/JCMT/continuum/background/background.html)
+97      SCUBA 850WB (www.jach.hawaii.edu/JCMT/continuum/background/background.html)
+98      Herschel PACS 70um
+99      Herschel PACS 100um
+100     Herschel PACS 160um
+101     Herschel SPIRE 250um
+102     Herschel SPIRE 350um
+103     Herschel SPIRE 500um
+104     IRAS 12um
+105     IRAS 25um
+106     IRAS 60um
+107     IRAS 100um
+108     Bessell L   (Bessell & Brett 1988)
+109     Bessell L'  (Bessell & Brett 1988)
+110     Bessell M   (Bessell & Brett 1988)
+111     Stromgren u (Bessell 2011)
+112     Stromgren v (Bessell 2011)
+113     Stromgren b (Bessell 2011)
+114     Stromgren y (Bessell 2011)
+115     Idealized 1500A  (15% bandwidth, FWHM = 225A from M. Dickinson)
+116     Idealized 2300A  (15% bandwidth, FWHM = 345A from M. Dickinson)
+117     Idealized 2800A  (15% bandwidth, FWHM = 420A from M. Dickinson)
+118     JWST F070W 
+119     JWST F090W 
+120     JWST F115W 
+121     JWST F150W 
+122     JWST F200W 
+123     JWST F277W 
+124     JWST F356W 
+125     JWST F444W 
+126     JWST F150W2
+127     JWST F322W2
+128     CFHT WIRCAM J
+129     CFHT WIRCAM Ks
+130     VISTA Y
+131     VISTA J
+132     VISTA H
+133     VISTA K
+134     ISAAC Js
+135     ISAAC H
+136     NMBS J1
+137     NMBS J2
+138     NMBS J3
+139     NMBS H1
+140     NMBS H2
+141     NMBS Ks
+142     Subaru SuprimeCam IA427
+143     Subaru SuprimeCam IA445
+144     Subaru SuprimeCam IA464
+145     Subaru SuprimeCam IA484
+146     Subaru SuprimeCam IA505
+147     Subaru SuprimeCam IA527
+148     Subaru SuprimeCam IA550
+149     Subaru SuprimeCam IA574
+150     Subaru SuprimeCam IA598
+151     Subaru SuprimeCam IA624
+152     Subaru SuprimeCam IA651
+153     Subaru SuprimeCam IA679
+154     Subaru SuprimeCam IA709
+155     Subaru SuprimeCam IA738
+156     Subaru SuprimeCam IA767
+157     Subaru SuprimeCam IA797
+158     Subaru SuprimeCam IA827
+159     Subaru SuprimeCam IA856
+160     Subaru SuprimeCam IA907
+161     VIMOS U
+162     VIMOS R
+163     Subaru Bj
+164     Subaru Vj
+165     Subaru r+
+166     Subaru i+
+167     Subaru z+
+168     WFI U38
+169     WFI B99
+170     WFI V
+171     WFI Rc
+172     WFI Ic
+173     CFHT WIRCAM H
+174     WFI I EIS
+175     CAPAK Subaru B (cosmos-b) 
+176     CAPAK Subaru V (cosmos-v) 
+177     CAPAK Subaru r (cosmos-r) 
+178     CAPAK Subaru i (cosmos-i) 
+179     CAPAK Subaru z (cosmos-z) 
+180     LRIS g blue
+181     LRIS Rs red
+182     MOIRCS J
+183     MOIRCS H
+184     MOIRCS K
+185     MOSAIC U
+186     maiz U
+187     maiz B
+188     maiz V
+189     VISTA Z
+190     CFHT Megacam r  (New filter from 2014, curve made by M.Fossati)
+191     CFHT Megacam Ha (New filter from 2015, curve made by M.Fossati)
+192	MUSE BLUE  (tophat)
+193     MUSE GREEN (tophat)
+194     MUSE RED   (tophat)
+195     MUSE NIR   (tophat)
+196     MUSE WHITE AOE (from muse manual)
+197     UVIT FUV F154W (UVIT FUV Filter, in-orbit calib. July 2017 (A. Subramaniam))
+198     HAWKI H
+199	HAWKI CH4
+200	HAWKI Ks (from eso website)
+201	JWST MIRI F770W
+202	JWST MIRI F1000W
+203	JWST MIRI F1280W
+204	JWST MIRI F1800W
