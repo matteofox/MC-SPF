@@ -666,7 +666,7 @@ for ind in range(nobj):
             regstr = '{}'.format((str(obj)).ljust(7))
             for i in range(ndim): 
                regstr += '{:8.3f} {:8.3f} {:8.3f} '.format(percs[i,0], percs[i,1], percs[i,2])
-            regstr += '{:8.3f} {:8.3f} {:8.3f} {:8.3f} {:8.3f} {:8.3f} '.format(medlsfr, perclsfr[1], perclsfr[2], zupd, lnz, photo_chisq)
+            regstr += '{:8.3f} {:8.3f} {:8.3f} {:8.3f} {:8.3f} {:8.3f} '.format(perclsfr[0], perclsfr[1], perclsfr[2], zupd, lnz, photo_chisq)
             for i in range(len(spec_chisq)):
                regstr += '{:8.3f} '.format(spec_chisq[i])
 
