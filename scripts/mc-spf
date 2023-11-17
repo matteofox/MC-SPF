@@ -674,7 +674,7 @@ for ind in range(nobj):
             if os.path.isfile(plotdir+fit_file):
                with open(plotdir+fit_file) as fitfile:
                  lines = fitfile.readlines()
-               start = [line[:3] for line in lines]
+               start = [line.split(' ')[0] for line in lines]
                try:
                  pos = start.index(str(obj).ljust(3))
                  lines[pos] = regstr+'\n'
