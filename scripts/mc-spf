@@ -68,6 +68,7 @@ grpplt.add_argument('--sprange',   default= None,    help='Y-axis (Flux) range f
 grpplt.add_argument('--phrange',   default= None,    help='Y-axis (Luminosity) range for photometry plot')
 grpplt.add_argument('--timerange',  default= None,    help='X-axis (Time) range for SFH plot')
 grpplt.add_argument('--rasterize', dest='rasterize', action='store_true', help='If set, will make smaller summary plots by rasterizing some lines.')
+grpplt.add_argument('--overrideid', default= None, help='If set to a string, this will be plot instead of the ID number.')
 
 grpout = parser.add_argument_group('Output control arguments')
 
@@ -694,6 +695,330 @@ for ind in range(nobj):
                with open(plotdir+fit_file,"w") as fitfile:
                  fitfile.write(header+'\n')
                  fitfile.write(regstr+'\n')
+
+    elif args.mode == 'PLOTCART':
+        
+        if os.path.exists('{0}post_equal_weights.dat'.format(out_fmt.format(obj))):
+    
+          with sps_spec_fitter(this_obj_z, model_file, this_obj_flux, this_obj_err, \
+                this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
+                filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
+                res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
+                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel) as temp:
+                            
+            a = pymultinest.Analyzer(n_params=ndim, outputfiles_basename=out_fmt.format(obj))
+            values = a.get_equal_weighted_posterior()
+            
+            stat = a.get_stats()
+
+            lnz, dlnz = stat['global evidence'], stat['global evidence error']
+            print('      RESULTS Nested Sampling Ln(z):   {0:6.3f}'.format(lnz))
+                                    
+            if temp.n_spec ==0:
+            
+              fig = pl.figure(figsize=(12,2.6), dpi=200)
+
+              #Photometry plot
+              ax1 = fig.add_axes([0.08,0.08,0.38,0.80])
+              ax1.set_xscale('log')
+              ax1.set_yscale('log')
+                           
+              #SFH and corner plot
+              ax4 = fig.add_axes([0.51,0.08,0.25,0.80])
+              ax5 = fig.add_axes([0.82,0.08,0.15,0.80])
+            
+            elif temp.n_spec ==1:
+            
+              fig = pl.figure(figsize=(12,6), dpi=200)
+
+              #Spectroscopy and spec residuals
+              axsp = [fig.add_axes([0.08,0.62,0.89,0.30])]
+              axsr = [fig.add_axes([0.08,0.52,0.89,0.10])]
+
+              #Photometry plot
+              ax1 = fig.add_axes([0.08,0.08,0.37,0.35])
+              ax1.set_xscale('log')
+              ax1.set_yscale('log')
+              ax1.xaxis.set_major_formatter(StrMethodFormatter(r'${x:.1f}$'))
+              #ax1.xaxis.set_minor_formatter(StrMethodFormatter(r'${x:.1f}$'))
+                            
+              #SFH and corner plot
+              ax4 = fig.add_axes([0.51,0.08,0.25,0.35])
+              ax5 = fig.add_axes([0.82,0.08,0.15,0.35])
+            
+            elif temp.n_spec >1:
+            
+              fig = pl.figure(figsize=(12,10), dpi=200)
+
+              #Spectroscopy and spec residuals
+              axsp = [fig.add_axes([0.08,0.71,0.89,0.21]),fig.add_axes([0.08,0.41,0.89,0.21])] 
+              axsr = [fig.add_axes([0.08,0.65,0.89,0.06]),fig.add_axes([0.08,0.35,0.89,0.06])] 
+              
+              #Photometry plot
+              ax1 = fig.add_axes([0.08,0.08,0.38,0.21])
+              ax1.set_xscale('log')
+              ax1.set_yscale('log')
+              ax1.xaxis.set_major_formatter(StrMethodFormatter(r'${x:.1f}$'))
+              ax1.xaxis.set_minor_formatter(StrMethodFormatter(r'${x:.1f}$'))
+                            
+              #SFH and corner plot
+              ax4 = fig.add_axes([0.51,0.08,0.25,0.21])
+              ax5 = fig.add_axes([0.82,0.08,0.15,0.21])
+              
+            meds  = np.percentile(values, 50, axis=0)
+            percs = np.transpose(np.percentile(values, [16,50,84], axis=0))
+            
+            for i in range(ndim):
+             print('      RESULTS Best fit for parameter {0}: {1:8.3f} + {2:7.3f} - {3:7.3f}'.format(parameters[i].ljust(10), meds[i], abs(percs[i,2]-meds[i]), abs(percs[i,0]-meds[i])))
+            
+            #Calculate SFR
+            nsamp = 500
+            sfr_samp = np.zeros(nsamp)
+            rsamples = np.random.randint(values.shape[0], size=nsamp)
+            
+            for ind,ii in enumerate(rsamples):
+                tsamp = values[ii,:-1]
+                if sfh_type != 'custom':
+                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[5]))
+                else:
+                   sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
+                   sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[5]))
+                
+                
+            medlsfr  = np.percentile(sfr_samp, 50)
+            perclsfr = np.percentile(sfr_samp, [16,50,84])
+            print('      RESULTS Best fit for parameter {0}: {1:8.3f} + {2:7.3f} - {3:7.3f} (DERIVED)'.format('lSFR'.ljust(10), medlsfr, abs(perclsfr[2]-medlsfr), abs(perclsfr[0]-medlsfr)))
+
+            zupd = (1.+this_obj_z)*(1.+meds[4]*1e13/temp.clight)-1
+
+            mflux, mphot = temp.reconstruct_phot(meds, ndim)
+            
+            if args.writesed:
+              print('      INFO Writing SEDs...')
+              #Best SED
+              msed_flam = mphot*temp.fscale #erg/cm2/s/A
+              msed_fnu  = msed_flam*temp.red_wl**2/temp.clight*1E26 #output in funit
+            
+              col1 = fits.Column(name='wave_obs' , format='E', unit='Angstrom_vac', array=temp.red_wl)
+              col2 = fits.Column(name='wave_rest', format='E', unit='Angstrom_vac', array=temp.red_wl/(1+this_obj_z))
+              col3 = fits.Column(name='f_lam_obs', format='E', unit='erg/cm2/s/A',      array=msed_flam)
+              col4 = fits.Column(name='f_lam_rest',format='E', unit='erg/cm2/s/A',      array=msed_flam*(1+this_obj_z))
+              col5 = fits.Column(name='f_nu_obs',  format='E', unit=args.funit,         array=msed_fnu)
+            
+              hdu = fits.BinTableHDU.from_columns([col1, col2, col3, col4, col5])
+              hdu.writeto(plotdir+'id{0}_best_sed.fits'.format(obj), overwrite=True)
+              
+              hdu = fits.BinTableHDU.from_columns([col1])
+              nsamples = np.min((nsamp, args.nsampwrite))
+              colarray=[col1]
+              
+              for ind, ii in enumerate(rsamples[:nsamples]):
+                   tsamp = values[ii,:-1]
+                   tflux, tphot = temp.reconstruct_phot(tsamp, ndim)
+                   colarray.append(fits.Column(name='f_nu_obs_{}'.format(ind),  format='E', unit=args.funit,  array=tphot*temp.fscale*temp.red_wl**2/temp.clight*1E26))
+              
+              hdu = fits.BinTableHDU.from_columns(colarray)
+              hdu.writeto(plotdir+'id{0}_samp_sed.fits'.format(obj), overwrite=True)
+                   
+            #Compute photometric chisquare
+            oflux_lam = this_obj_flux* temp.clight/temp.pivot_wl**2
+            oflux_err_lam = this_obj_err* temp.clight/temp.pivot_wl**2
+                            
+            photo_chisq = np.nansum(((oflux_lam-mflux)/oflux_err_lam)**2)
+            photo_chisq /= len(this_obj_flux)
+            
+            print('      RESULTS Reduced Phot Chi square: {0:7.3f}'.format(photo_chisq))
+                        
+            if args.overrideid:
+                fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{args.overrideid}} ~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
+                     .format(obj, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
+            else:
+               fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
+                     .format(obj, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
+            
+            
+            spfscale = 1E18 #go from 1e-20 to 1e-18
+            
+            if temp.n_spec > 0 :
+               
+               if args.sprange != None:
+                  sprange = np.array((args.sprange).split(','), dtype=float)
+               else:
+                  sprange = np.array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1])
+               
+               spec_chisq = np.zeros(temp.n_spec)
+                                 
+               for spid in range(temp.n_spec):
+               
+                   #Reconstruct spectral fit on original grid
+                   totspec, contspec, emispec = temp.reconstruct_spec(meds, ndim, spid, retall=True)
+                   
+                   #Plot spectral points
+                   pl.sca(axsp[spid])
+                   
+                   zoom = 1.5
+                   
+                   pltsp.plotspec(10**temp.log_wl[spid], temp.log_obj[spid]*temp.spec_norm[spid]*spfscale, color='black',       mask= temp.goodpix_spec[spid], zorder=1.05)                
+                   pltsp.plotspec(10**temp.log_wl[spid], temp.log_obj[spid]*temp.spec_norm[spid]*spfscale, color='darkgrey',    mask=~temp.goodpix_spec[spid], zorder=1.05)
+                   clean_spec = contspec*temp.spec_norm[spid]*spfscale 
+                   
+                   axsp[spid].plot(10**temp.log_wl[spid], totspec*temp.spec_norm[spid]*spfscale, '-', alpha=1.0, color='firebrick', lw=1.0, zorder=1.1)
+                   if sprange[2*spid] == -1 and sprange[2*spid+1] == -1:
+                      axsp[spid].axis([(10**temp.log_wl[spid]).min(),(10**temp.log_wl[spid]).max(),clean_spec.min()-0.1*clean_spec.ptp(),clean_spec.max()+zoom*clean_spec.ptp()])               
+                   else:
+                      axsp[spid].axis([(10**temp.log_wl[spid]).min(),(10**temp.log_wl[spid]).max(),sprange[2*spid], sprange[2*spid+1]])               
+                                      
+                   axsp[spid].xaxis.set_major_locator(MultipleLocator(500))
+                   axsp[spid].xaxis.set_minor_locator(MultipleLocator(100))
+                   
+                   axsp[spid].set_ylabel(r'$f_\lambda [10^{{-{0:2.0f}}}~\mathrm{{erg~s^{{-1}}~cm^{{-2}}~\AA^{{-1}}}}]$'.format(np.log10(spfscale)))
+                   axsr[spid].set_ylabel(r'$f_\lambda-f_\mathrm{model}$')
+                   if spid == temp.n_spec -1:
+                      axsr[spid].set_xlabel(r'$\mathrm{Observed~Wavelength}~[\mathrm{\AA}]$')
+                   
+                   for tick in axsp[spid].xaxis.get_major_ticks():
+                       tick.label1On=False
+
+                   #Plot spectral residuals
+                   axsr[spid].plot(10**temp.log_wl[spid][temp.goodpix_spec[spid]],  ((totspec - temp.log_obj[spid])*temp.spec_norm[spid]*spfscale)[temp.goodpix_spec[spid]], 'ko', ms=2.0, alpha=1.0, mec='None', mfc='black')
+                   axsr[spid].plot(10**temp.log_wl[spid][~temp.goodpix_spec[spid]], ((totspec - temp.log_obj[spid])*temp.spec_norm[spid]*spfscale)[~temp.goodpix_spec[spid]], 'o', ms=2.0, alpha=1.0, mec='None', mfc='darkgrey', color='darkgrey')
+                   
+                   axsr[spid].fill_between(10**temp.log_wl[spid], (-1*np.exp(meds[12+spid])*temp.log_noise[spid]*temp.spec_norm[spid]*spfscale), (1*np.exp(meds[12+spid])*temp.log_noise[spid]*temp.spec_norm[spid]*spfscale), color='lightgrey')
+                   
+                   axsr_range = np.abs(np.percentile(((totspec - temp.log_obj[spid])*temp.spec_norm[spid]*spfscale)[temp.goodpix_spec[spid]],[2,98]))
+                   axsr[spid].axis([(10**temp.log_wl[spid]).min(),(10**temp.log_wl[spid]).max(),-1*np.max(axsr_range), +1*np.max(axsr_range)])
+                                              
+                   #Calculate spec chiquare
+                   spec_chisq[spid] = np.nansum((((totspec - temp.log_obj[spid])/(np.exp(meds[12+spid])*temp.log_noise[spid]))[temp.goodpix_spec[spid]])**2)
+                   spec_chisq[spid] /= (temp.goodpix_spec[spid]).sum()
+                   
+                   print('      RESULTS Reduced Spec {} Chi square: {:7.3f}'.format(spid, spec_chisq[spid]))
+            
+            else:
+               spec_chisq = [-1]
+            
+            #Set number and index of random samples
+            nsamp = 100
+            rsamples = np.random.randint(values.shape[0], size=nsamp)
+            phxmin = 0.8*np.min(temp.pivot_wl/1e4)
+            phxmax = 1.2*np.nanmax(temp.pivot_wl/1e4)
+
+            npoints = len(temp.dusty_phot_young[(temp.red_wl/1e4 > phxmin) & (temp.red_wl/1e4 < phxmax)])
+            if npoints > 5000:
+                stride = int(npoints/5000)
+            else:
+                stride = 1    
+                            
+            for ii in rsamples:
+                tsamp = values[ii,:-1]
+                tflux, tphot = temp.reconstruct_phot(tsamp, ndim)
+                
+                ax1.plot(temp.red_wl/1e4, tphot*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='firebrick', alpha=0.1, lw=0.6, rasterized=args.rasterize)
+                ax1.plot(temp.red_wl/1e4, temp.dusty_phot_young*10**tsamp[5]*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='blue', alpha=0.1, lw=0.6, rasterized=args.rasterize)
+                ax1.plot(temp.red_wl/1e4, temp.dusty_phot_old*10**tsamp[5]*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='red' , alpha=0.1, lw=0.6, rasterized=args.rasterize)
+                
+                #Make this array in Myr
+                if temp.timeunit =='Myr':
+                   age_array = np.arange(int(tsamp[1]))
+                elif temp.timeunit =='Gyr':   
+                   age_array = np.arange(int(tsamp[1])*1000)/1000.
+                else:
+                   print('{Time unit {} not implemented yet.}'.format(temp.timeunit))
+                
+                if sfh_func != 'none':
+                   sfh_samp = sfh_func(temp.sfh_array, tsamp[1],tsamp[0])*10**(tsamp[5])
+                   ax4.plot(np.arange(len(sfh_samp)), sfh_samp,color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
+                else:
+                   sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
+                   age_samp = int(age_samp)
+                   sfh_samp = sfh_samp[:age_samp]
+                   ax4.plot(np.arange(age_samp), sfh_samp*10**(tsamp[5]),color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
+                                 
+            
+            #Datapoints on photometry
+            ax1.errorbar(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, yerr=temp.eflux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, fmt='none', capsize=3, zorder=30, ecolor='black')
+            ax1.plot(temp.pivot_wl/1e4, temp.flux_obs*temp.pivot_wl*temp.flux_to_lum/temp.lsun, 'ko', ms=6.0)
+            ax1.plot(temp.pivot_wl/1e4, mflux*temp.pivot_wl*temp.flux_to_lum/temp.lsun, marker='*', mec='magenta', mfc='none', ms=15.0, ls='none', zorder=100)
+
+            if args.phrange != None:
+               phrange = np.array((args.phrange).split(','), dtype=float)
+            else:
+               phrange = np.array([1e6,2e11])
+
+            if args.timerange != None:
+               timerange = np.array((args.timerange).split(','), dtype=float)
+               ax4.set_xlim(timerange)
+
+            ax1.axis([phxmin, phxmax, phrange[0],phrange[1]])
+            ax1.set_xlabel(r'$\mathrm{Observed~Wavelength}~[\mu \mathrm{m}]$')
+            ax1.set_ylabel(r'$\lambda~L_\lambda [L_\odot]$')
+            
+            ax4.set_xlabel(r'$\mathrm{{Time~[{}]}}$'.format(temp.timeunit))
+            ax4.set_ylabel(r'$SFR~\mathrm{[M_\odot~yr^{-1}]}$')
+                    
+            #Plot Tquench Tauquench covariance plot
+            triangle.hist2d(values[:,1], values[:,0], ax=ax5)
+            ax5.axvline(meds[1], color='firebrick', lw=1)
+            ax5.axhline(meds[0], color='firebrick', lw=1)
+            
+            parx_str = sfh_pars[1].capitalize()
+            pary_str = sfh_pars[0].capitalize()
+            
+            if 'Age' in parx_str or 'Tau' in parx_str:
+               parx_unit = '['+temp.timeunit+']'
+            else:
+               parx_unit = ''   
+            
+            if 'Age' in pary_str or 'Tau' in pary_str:
+               pary_unit = '['+temp.timeunit+']'
+            else:
+               pary_unit = ''   
+            
+            if parx_str == 'Frac3':
+               parx_str == 'Frac.~Old'
+               pary_str == 'Frac.~Young'
+            elif parx_str == 'Jumpage':
+               parx_str == 'Jump~Age'
+               pary_str == 'Frac.~Old'
+            
+            ax5.set_xlabel(r'$\mathrm{{{}~{}}}$'.format(parx_str,parx_unit))
+            ax5.set_ylabel(r'$\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
+            
+            pl.savefig(plotdir+'id{0}_summary.pdf'.format(obj), bbox_inches='tight')
+            
+            #Now deal with the fit file
+            regstr = '{}'.format((str(obj)).ljust(7))
+            for i in range(ndim): 
+               regstr += '{:8.3f} {:8.3f} {:8.3f} '.format(percs[i,0], percs[i,1], percs[i,2])
+            regstr += '{:8.3f} {:8.3f} {:8.3f} {:8.3f} {:8.3f} {:8.3f} '.format(perclsfr[0], perclsfr[1], perclsfr[2], zupd, lnz, photo_chisq)
+            for i in range(len(spec_chisq)):
+               regstr += '{:8.3f} '.format(spec_chisq[i])
+
+            
+            if os.path.isfile(plotdir+fit_file):
+               with open(plotdir+fit_file) as fitfile:
+                 lines = fitfile.readlines()
+               start = [line.split(' ')[0] for line in lines]
+               try:
+                 pos = start.index(str(obj).ljust(3))
+                 lines[pos] = regstr+'\n'
+               except ValueError:
+                 lines.append(regstr+'\n')
+               with open(plotdir+fit_file, 'w') as fitfile:   
+                  fitfile.writelines(sorted(lines))
+                 
+            else:
+               header = '#ID '
+               for i in range(ndim):
+                 header += '{}_16 {}_50 {}_84 '.format(parameters[i].upper(), parameters[i].upper(),parameters[i].upper())
+               header += 'LSFR_16 LSFR_50 LSFR_84 ZSPS LNZ CHI2_PHOT '
+               for i in range(len(spec_chisq)):
+                 header += 'CHI2_SPC{} '.format(i+1)
+                 
+               with open(plotdir+fit_file,"w") as fitfile:
+                 fitfile.write(header+'\n')
+                 fitfile.write(regstr+'\n')
+
 
     elif args.mode == 'PLOTMINIMAL':
         
