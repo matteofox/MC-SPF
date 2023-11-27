@@ -339,7 +339,7 @@ for ind in range(nobj):
     Gpriors = np.tile('none', 2*ndim).astype(object)  
             
     priorAext = [1.17,0.001]
-
+    print(args.mode)
     if args.mode =='FIT' or args.mode=='FITSPEC' or args.mode == 'FITPHOT':
      
      if args.refit ==True or ~(os.path.exists('{0}post_equal_weights.dat'.format(out_fmt.format(obj)))):
@@ -830,8 +830,8 @@ for ind in range(nobj):
             print('      RESULTS Reduced Phot Chi square: {0:7.3f}'.format(photo_chisq))
                         
             if args.overrideid:
-                fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{args.overrideid}} ~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
-                     .format(obj, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
+                fig.text(0.08, 0.94-0.005*temp.n_spec, r'${0} ~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
+                     .format(args.overrideid, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
             else:
                fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
                      .format(obj, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
@@ -973,13 +973,13 @@ for ind in range(nobj):
                pary_unit = '['+temp.timeunit+']'
             else:
                pary_unit = ''   
-            
+            print(parx_str)
             if parx_str == 'Frac3':
-               parx_str == 'Frac.~Old'
-               pary_str == 'Frac.~Young'
+               parx_str = 'Frac_{old}'
+               pary_str = 'Frac_{young}'
             elif parx_str == 'Jumpage':
-               parx_str == 'Jump~Age'
-               pary_str == 'Frac.~Old'
+               parx_str = 'Jump~Age'
+               pary_str = 'Frac_{old}'
             
             ax5.set_xlabel(r'$\mathrm{{{}~{}}}$'.format(parx_str,parx_unit))
             ax5.set_ylabel(r'$\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
