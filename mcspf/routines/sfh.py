@@ -18,9 +18,9 @@ def delsfh(dummy, time, tau):
 
     _tau = np.copy(tau)
     _time = np.copy(time)
-        
+
     #Time must be in steps of 1 Myr
-    sfh = _time*np.exp(-timearr/_tau)/_tau**2
+    sfh = timearr*np.exp(-timearr/_tau)/_tau**2
     intsfh = sfh.sum() * 1E6
     return sfh/intsfh
 
