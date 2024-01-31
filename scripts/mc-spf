@@ -193,6 +193,7 @@ if args.fescrange is None:
 else:
    tmpstr = (args.fescrange).replace('m','-')
    fescrange = np.array(tmpstr.split(','), dtype=float)
+   print('INFO: fesc user defined limits : {} {}'.format(fescrange[0],fescrange[1]))
 
 if args.sigrange is None:
    sigrange=[1.,500.]
@@ -536,12 +537,12 @@ for ind in range(nobj):
                if args.spyrange != None:
                   spyrange = np.array((args.spyrange).split(','), dtype=float)
                else:
-                  spyrange = np.array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1])
+                  spyrange = np.array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1], dtype=float)
                
                if args.spxrange != None:
                   spxrange = np.array((args.spxrange).split(','), dtype=float)
                else:
-                  spxrange = np.array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1])
+                  spxrange = np.array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1], dtype=float)
                
                spec_chisq = np.zeros(temp.n_spec)
                                  
@@ -568,7 +569,8 @@ for ind in range(nobj):
                    if spxrange[2*spid] == -1 and spxrange[2*spid+1] == -1:
                       spxrange[2*spid]   = (10**temp.log_wl[spid]).min()
                       spxrange[2*spid+1] = (10**temp.log_wl[spid]).max()
-                                      
+                   
+                   print('DEBUG: {} {}'.format(spyrange[2*spid], spyrange[2*spid+1]))                
                    axsp[spid].axis([spxrange[2*spid],spxrange[2*spid+1],spyrange[2*spid], spyrange[2*spid+1]])               
                                       
                    axsp[spid].xaxis.set_major_locator(MultipleLocator(500))
