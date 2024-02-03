@@ -15,9 +15,10 @@ try:
 except:
   import triangle
 
-from mcspf.routines import sps_spec_fitter, redir_stdout
+from mcspf.routines import sps_spec_fitter
 from mcspf.routines import sfh as sfh
 from mcspf.utils    import plotspec as pltsp
+from mcspf.utils    import redir_stdout 
 
 pl.rc('text', usetex=True)
 
@@ -55,7 +56,8 @@ grpfit.add_argument('--nlive',     default= 500,   type=int,   help='Number of l
 grpfit.add_argument('--sampeff',   default= 0.7,   type=float, help='Sampling efficiency in the Multinest solver. Lower is more \
                                                                      precise and computationally expensive, default=0.7')
 grpfit.add_argument('--sfhpar1range',    default= None,  help='SFH parameter 1 range. Default = Full range in the model grid')
-grpfit.add_argument('--sfhpar2range',    default= None,  help='SFH parameter 2 range. Default = Full range in the model grid')
+grpfit.add_argument('--sfhpar2range',    default= None,  help='SFH parameter 2 range. Default = Full range in the model grid (Only valid if model has 2 or 3 parameters)')
+grpfit.add_argument('--sfhpar3range',    default= None,  help='SFH parameter 3 range. Default = Full range in the model grid (Only valid if model has 3 parameters)')
 grpfit.add_argument('--fescrange',       default= None,  help='Multiplicative escape fraction Default = -0.5,0.5')
 grpfit.add_argument('--sigrange',        default= None,  help='Stellar sigma range Default = 1,500')
 grpfit.add_argument('--velrange',        default= None,  help='Stellar velocity offset range w.r.t. redshift value in input file. Default = -250,250 \
@@ -127,8 +129,17 @@ elif args.sfh =='del':
 elif os.path.isfile(args.sfh):
    model_file = args.sfh
    tmphdu = fits.open(model_file)
-   sfh_pars = [tmphdu[0].header['PAR1'], tmphdu[0].header['PAR2']]
    
+   #Extract number of pars and their names
+   sfh_pars = []
+   sfh_npars = 0
+   while True:
+     try:
+       sfh_pars.append(tmphdu[0].header['PAR{}'.format(sfh_npars+1)])
+       sfh_npars += 1
+     except:
+       break
+               
    try:
      sfhstrfunc = tmphdu[0].header['SFHFUNC']
      if sfhstrfunc =='exp':
@@ -148,7 +159,7 @@ elif os.path.isfile(args.sfh):
      sfh_func = 'none'   
      sfh_type = 'custom'
    
-   
+   #FIXME: This block will fail with 1 or 3 pars
    if (tmphdu[0].header['PAR1']).lower() == 'age':
       sfh_age_par = 0
    elif  (tmphdu[0].header['PAR2']).lower() == 'age':
@@ -218,6 +229,12 @@ else:
    tmpstr = (args.sfhpar2range).replace('m','-')
    sfhpar2range = np.array(tmpstr.split(','), dtype=float)
 
+if args.sfhpar3range is None:
+   sfhpar3range = None
+else:
+   tmpstr = (args.sfhpar3range).replace('m','-')
+   sfhpar3range = np.array(tmpstr.split(','), dtype=float)
+
 
 #Open filter file
 ffilt = np.loadtxt(args.filtfile, dtype=object) 
@@ -255,11 +272,13 @@ for ind in range(nobj):
         dl = None    
     
     for col in colnames:
+       
        #------- INPUT UNITS --------
        #Flux input must be in xJy for all the bands. A few lines 
        #below it is converted into erg s^-1 cm^-2 Hz^-1 = 1E-26 mJy
        #----------------------------
        #Is this a flux column?
+       
        if col[:2].upper() == 'F_':      
           #Which band is this column for?
           photband = col[2:]
@@ -339,13 +358,16 @@ for ind in range(nobj):
          polymax = np.array((catalogue['polymax'][catind]).split(','), dtype=int)
     except:
       polymax = [3,3,3,3,3,3]
-        
-    parameters = [sfh_pars[0].capitalize(), sfh_pars[1].capitalize(), 'Av', 'Av_extra', 'Dale_alpha', 'lMstar', 'sigma', 'vel', 'sigma_gas', 'age_gas', 'ion_gas', 'fesc', 'lnf1', 'lnf2']
     
-    ndim = len(parameters)
-            
+        
+    #ISSUE HERE    
+    parameters = [] + sfh_pars
+    parameters += ['Av', 'Av_extra', 'Dale_alpha', 'lMstar', 'sigma', 'vel', 'sigma_gas', 'age_gas', 'ion_gas', 'fesc', 'lnf1', 'lnf2']
+    
     #Start with no priors on all parameters
-    Gpriors = np.tile('none', 2*ndim).astype(object)  
+    #If priors are needed change the code here
+    #Gpriors = np.tile('None', 2*len(parameters)).astype(object)  
+    Gpriors = None
             
     priorAext = [1.17,0.001]
 
@@ -359,7 +381,7 @@ for ind in range(nobj):
                Gpriors=Gpriors, priorAext=priorAext, fit_spec=fit_spec, fit_phot=fit_phot, \
                polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
                sfh_age_par = sfh_age_par, dl=dl, sfhpar1range=sfhpar1range, \
-               sfhpar2range=sfhpar2range,fescrange=fescrange,sigrange=sigrange,\
+               sfhpar2range=sfhpar2range,sfhpar3range=sfhpar3range,fescrange=fescrange,sigrange=sigrange,\
                velrange=velrange,emimetal=args.emimetal,emimodel=args.emimodel) as temp:
     
           
@@ -369,7 +391,7 @@ for ind in range(nobj):
             solver.run(min_num_live_points=args.nlive,dlogz=0.5)
 
           elif args.solver =='multinest':
-            pymultinest.run(temp.lnlhood_mn, temp._scale_cube_mn, ndim, sampling_efficiency=args.sampeff, resume=False, \
+            pymultinest.run(temp.lnlhood_mn, temp._scale_cube_mn, temp.ndims, sampling_efficiency=args.sampeff, resume=False, \
                     outputfiles_basename=out_fmt.format(obj), verbose=True, multimodal=False, \
                     importance_nested_sampling=False, n_live_points=args.nlive, n_iter_before_update=500, \
                     evidence_tolerance=0.5)
@@ -399,7 +421,7 @@ for ind in range(nobj):
                 res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
                 sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel) as temp:
                             
-            a = pymultinest.Analyzer(n_params=ndim, outputfiles_basename=out_fmt.format(obj))
+            a = pymultinest.Analyzer(n_params=temp.ndims, outputfiles_basename=out_fmt.format(obj))
             values = a.get_equal_weighted_posterior()
             
             stat = a.get_stats()
@@ -461,21 +483,22 @@ for ind in range(nobj):
             meds  = np.percentile(values, 50, axis=0)
             percs = np.transpose(np.percentile(values, [16,50,84], axis=0))
             
-            for i in range(ndim):
+            for i in range(temp.ndims):
              print('      RESULTS Best fit for parameter {0}: {1:8.3f} + {2:7.3f} - {3:7.3f}'.format(parameters[i].ljust(10), meds[i], abs(percs[i,2]-meds[i]), abs(percs[i,0]-meds[i])))
             
             #Calculate SFR
             nsamp = 500
+            mstarind = temp.sfh_npars+3
             sfr_samp = np.zeros(nsamp)
             rsamples = np.random.randint(values.shape[0], size=nsamp)
             
             for ind,ii in enumerate(rsamples):
                 tsamp = values[ii,:-1]
                 if sfh_type != 'custom':
-                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[5]))
+                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[mstarind]))
                 else:
-                   sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
-                   sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[5]))
+                   sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, temp.ndims)
+                   sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[mstarind]))
                 
                 
             medlsfr  = np.percentile(sfr_samp, 50)
@@ -484,7 +507,7 @@ for ind in range(nobj):
 
             zupd = (1.+this_obj_z)*(1.+meds[4]*1e13/temp.clight)-1
 
-            mflux, mphot = temp.reconstruct_phot(meds, ndim)
+            mflux, mphot = temp.reconstruct_phot(meds, temp.ndims)
             
             if args.writesed:
               print('      INFO Writing SEDs...')
@@ -524,10 +547,10 @@ for ind in range(nobj):
                         
             if np.isfinite(lnz) and np.isfinite(dlnz):
               fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} ~~~~~ \ln Z = {4:.2f}\pm{5:.2f}$'\
-                     .format(obj, this_obj_z, meds[5], medlsfr, lnz, dlnz), transform=fig.transFigure)
+                     .format(obj, this_obj_z, meds[mstarind], medlsfr, lnz, dlnz), transform=fig.transFigure)
             else:
               fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
-                     .format(obj, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
+                     .format(obj, this_obj_z, meds[mstarind], medlsfr), transform=fig.transFigure)
             
             
             spfscale = 1E18 #go from 1e-20 to 1e-18
@@ -549,7 +572,7 @@ for ind in range(nobj):
                for spid in range(temp.n_spec):
                
                    #Reconstruct spectral fit on original grid
-                   totspec, contspec, emispec = temp.reconstruct_spec(meds, ndim, spid, retall=True)
+                   totspec, contspec, emispec = temp.reconstruct_spec(meds, temp.ndims, spid, retall=True)
                    
                    #Plot spectral points
                    pl.sca(axsp[spid])
@@ -570,7 +593,6 @@ for ind in range(nobj):
                       spxrange[2*spid]   = (10**temp.log_wl[spid]).min()
                       spxrange[2*spid+1] = (10**temp.log_wl[spid]).max()
                    
-                   print('DEBUG: {} {}'.format(spyrange[2*spid], spyrange[2*spid+1]))                
                    axsp[spid].axis([spxrange[2*spid],spxrange[2*spid+1],spyrange[2*spid], spyrange[2*spid+1]])               
                                       
                    axsp[spid].xaxis.set_major_locator(MultipleLocator(500))
@@ -616,11 +638,11 @@ for ind in range(nobj):
                             
             for ii in rsamples:
                 tsamp = values[ii,:-1]
-                tflux, tphot = temp.reconstruct_phot(tsamp, ndim)
+                tflux, tphot = temp.reconstruct_phot(tsamp, temp.ndims)
                 
                 ax1.plot(temp.red_wl/1e4, tphot*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='firebrick', alpha=0.1, lw=0.6, rasterized=args.rasterize)
-                ax1.plot(temp.red_wl/1e4, temp.dusty_phot_young*10**tsamp[5]*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='blue', alpha=0.1, lw=0.6, rasterized=args.rasterize)
-                ax1.plot(temp.red_wl/1e4, temp.dusty_phot_old*10**tsamp[5]*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='red' , alpha=0.1, lw=0.6, rasterized=args.rasterize)
+                ax1.plot(temp.red_wl/1e4, temp.dusty_phot_young*10**tsamp[mstarind]*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='blue', alpha=0.1, lw=0.6, rasterized=args.rasterize)
+                ax1.plot(temp.red_wl/1e4, temp.dusty_phot_old*10**tsamp[mstarind]*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='red' , alpha=0.1, lw=0.6, rasterized=args.rasterize)
                 
                 #Make this array in Myr
                 if temp.timeunit =='Myr':
@@ -631,13 +653,13 @@ for ind in range(nobj):
                    print('{Time unit {} not implemented yet.}'.format(temp.timeunit))
                 
                 if sfh_func != 'none':
-                   sfh_samp = sfh_func(temp.sfh_array, tsamp[1],tsamp[0])*10**(tsamp[5])
+                   sfh_samp = sfh_func(temp.sfh_array, tsamp[1],tsamp[0])*10**(tsamp[mstarind])
                    ax4.plot(np.arange(len(sfh_samp)), sfh_samp,color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
                 else:
-                   sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
+                   sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, temp.ndims)
                    age_samp = int(age_samp)
                    sfh_samp = sfh_samp[:age_samp]
-                   ax4.plot(np.arange(age_samp), sfh_samp*10**(tsamp[5]),color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
+                   ax4.plot(np.arange(age_samp), sfh_samp*10**(tsamp[mstarind]),color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
                                  
             
             #Datapoints on photometry
@@ -686,7 +708,7 @@ for ind in range(nobj):
             
             #Now deal with the fit file
             regstr = '{}'.format((str(obj)).ljust(7))
-            for i in range(ndim): 
+            for i in range(temp.ndims): 
                regstr += '{:8.3f} {:8.3f} {:8.3f} '.format(percs[i,0], percs[i,1], percs[i,2])
             regstr += '{:8.3f} {:8.3f} {:8.3f} {:8.3f} {} {} {:8.3f} {:8.3f} '.format(perclsfr[0], perclsfr[1], perclsfr[2], zupd, str(Ndet).ljust(2), str(Nbands).ljust(2), lnz, photo_chisq)
             for i in range(len(spec_chisq)):
@@ -707,7 +729,7 @@ for ind in range(nobj):
                  
             else:
                header = '#ID '
-               for i in range(ndim):
+               for i in range(temp.ndims):
                  header += '{}_16 {}_50 {}_84 '.format(parameters[i].upper(), parameters[i].upper(),parameters[i].upper())
                header += 'LSFR_16 LSFR_50 LSFR_84 ZSPS NDET NBANDS LNZ CHI2_PHOT '
                for i in range(len(spec_chisq)):
@@ -800,7 +822,7 @@ for ind in range(nobj):
             for ind,ii in enumerate(rsamples):
                 tsamp = values[ii,:-1]
                 if sfh_type != 'custom':
-                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[5]))
+                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[mstarind]))
                 else:
                    sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
                    sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[5]))
