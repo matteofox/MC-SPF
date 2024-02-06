@@ -616,7 +616,7 @@ for ind in range(nobj):
                    axsr[spid].axis([(10**temp.log_wl[spid]).min(),(10**temp.log_wl[spid]).max(),-1*np.max(axsr_range), +1*np.max(axsr_range)])
                                               
                    #Calculate spec chiquare
-                   spec_chisq[spid] = np.nansum((((totspec - temp.log_obj[spid])/(np.exp(meds[12+spid])*temp.log_noise[spid]))[temp.goodpix_spec[spid]])**2)
+                   spec_chisq[spid] = np.nansum((((totspec - temp.log_obj[spid])/(np.exp(meds[temp.sfh_npars+10+spid])*temp.log_noise[spid]))[temp.goodpix_spec[spid]])**2)
                    spec_chisq[spid] /= (temp.goodpix_spec[spid]).sum()
                    
                    print('      RESULTS Reduced Spec {} Chi square: {:7.3f}'.format(spid, spec_chisq[spid]))
@@ -932,7 +932,7 @@ for ind in range(nobj):
                    axsr[spid].axis([(10**temp.log_wl[spid]).min(),(10**temp.log_wl[spid]).max(),-1*np.max(axsr_range), +1*np.max(axsr_range)])
                                               
                    #Calculate spec chiquare
-                   spec_chisq[spid] = np.nansum((((totspec - temp.log_obj[spid])/(np.exp(meds[12+spid])*temp.log_noise[spid]))[temp.goodpix_spec[spid]])**2)
+                   spec_chisq[spid] = np.nansum((((totspec - temp.log_obj[spid])/(np.exp(meds[temp.sfh_npars+10+spid])*temp.log_noise[spid]))[temp.goodpix_spec[spid]])**2)
                    spec_chisq[spid] /= (temp.goodpix_spec[spid]).sum()
                    
                    print('      RESULTS Reduced Spec {} Chi square: {:7.3f}'.format(spid, spec_chisq[spid]))
