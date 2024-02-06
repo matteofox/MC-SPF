@@ -827,7 +827,7 @@ class sps_spec_fitter:
             if np.all(model_spec == 0.):
                 return -np.inf
 
-            ispec2 = 1./((self.log_noise[ss]*np.exp(p[12+ss]))**2)
+            ispec2 = 1./((self.log_noise[ss]*np.exp(p[self.sfh_npars+10+ss]))**2)
 
             spec_lhood += -0.5*np.nansum((ispec2*(self.log_obj[ss]-model_spec)**2 - np.log(ispec2) + np.log(2.*np.pi))[self.goodpix_spec[ss]])
                   
@@ -917,7 +917,7 @@ class sps_spec_fitter:
     def reconstruct_spec(self, p, ndim, spid, retall=False):
         
         #Parameters: SFHpars, Av, Av_ext, Alpha, Lmass, DUMMY, DUMMY, DUMMY, AgeGas, IonGas, Fesc, DUMMY, DUMMY
-        #                      0      1     2     3      4       5      6      7       8      9      10      11
+        #           sfh_npars    0      1     2     3      4       5      6      7       8      9      10      11
         
         isfh = tuple(p[:self.sfh_npars])
         iav, iav_ext, _, ilmass, isig, ivel, isig_gas, iage_gas, iion_gas, ifesc, ilnf0, ilnf1 = p[self.sfh_npars:ndim] 
