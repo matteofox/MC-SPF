@@ -383,7 +383,7 @@ class sps_spec_fitter:
                 self.ext_lims, self.alpha_lims,  self.mass_lims, \
                 self.sig_lims, self.vel_lims, self.emmsig_lims, self.emmage_lims,\
                 self.emmion_lims, self.fesc_lims, self.lnf_lims, self.lnf_lims]
-         
+        
         self.ndims = len(self.bounds)   
         
     def sanitize_sfhpar_lims(self, sfhparrange, ind):
@@ -705,16 +705,21 @@ class sps_spec_fitter:
 
     def _make_dusty(self, wl):
         
+        n_wl = len(wl)
+        k_cal = np.zeros(n_wl, dtype=float)
+
         #compute attenuation assuming Calzetti+ 2000 law
         #single component 
-        n_wl = len(wl)
+
         R = 4.05
         div = wl.searchsorted(6300., side='left')
-        k_cal = np.zeros(n_wl, dtype=float)
         
+        #Longer than 6300
         k_cal[div:] = 2.659*( -1.857 + 1.04*(1e4/wl[div:])) + R
+        #Shorter than 6300
         k_cal[:div] = 2.659*(-2.156 + 1.509*(1e4/wl[:div]) - 0.198*(1e4/wl[:div])**2 + 0.011*(1e4/wl[:div])**3) + R
         
+        #Fix negative values with zeros
         zero = bisect_left(-k_cal, 0.)
         k_cal[zero:] = 0.
 
@@ -762,9 +767,11 @@ class sps_spec_fitter:
             if 'irac' in filt or 'pacs' in filt or 'spire' in filt or 'iras' in filt: 
                 td = np.trapz(((fobj.lambda_eff/self.red_wl)**(1.))*ntrans*self.red_wl, self.red_wl)
                 ntrans = ntrans/max(1e-70,td)
-
+            
+            #Calculate pivot wavelength following equation lam_pivot from SVO filter service
+            pivot_wl = np.sqrt(np.trapz(ntrans, self.red_wl) / np.trapz(ntrans / self.red_wl**2, self.red_wl))
             bands[ii,:] = ntrans
-            pivot[ii] = fobj.lambda_eff
+            pivot[ii] = pivot_wl
         
         return bands, pivot
 
@@ -1011,7 +1018,7 @@ class sps_spec_fitter:
         tot_young = (temp_young+emm_young) / (1+self.redshift)
         tot_old   = (temp_old  +emm_old) / (1+self.redshift)
         
-        #attenuate photometry spectrum, then compute fluxes given input bands
+        #attenuate photometry spectrum, k_cal is precomputed in the rest frame as it should be
         self.dusty_phot_young = (10**(-(iav+iav_ext)*self.k_cal) * (tot_young))
         self.dusty_phot_old   = (10**(-iav*self.k_cal) * (tot_old))
         self.dusty_phot       = self.dusty_phot_young + self.dusty_phot_old
