@@ -675,16 +675,27 @@ class sps_spec_fitter:
 
     def _make_dusty(self, wl):
         
+        n_wl = len(wl)
+        k_cal = np.zeros(n_wl, dtype=float)
+
         #compute attenuation assuming Calzetti+ 2000 law
         #single component 
-        n_wl = len(wl)
+
         R = 4.05
         div = wl.searchsorted(6300., side='left')
-        k_cal = np.zeros(n_wl, dtype=float)
         
+        #Longer than 6300
         k_cal[div:] = 2.659*( -1.857 + 1.04*(1e4/wl[div:])) + R
+        #Shorter than 6300
         k_cal[:div] = 2.659*(-2.156 + 1.509*(1e4/wl[:div]) - 0.198*(1e4/wl[:div])**2 + 0.011*(1e4/wl[:div])**3) + R
         
+        
+        #Use leiterer 2002 formula below 1500A
+        div = wl.searchsorted(1500., side='left')
+        #Shorter than 1500
+        k_cal[:div] = (5.472 + 0.671e4 / wl[:div] - 9.218e5 / wl[:div] ** 2 + 2.620e9 / wl[:div] ** 3)
+         
+        #Fix negative values with zeros
         zero = bisect_left(-k_cal, 0.)
         k_cal[zero:] = 0.
 
