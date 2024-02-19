@@ -62,7 +62,8 @@ class sps_spec_fitter:
 
     def __init__(self, redshift, phot_mod_file, flux_obs, eflux_obs, filter_list, lim_obs, \
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
-            fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None, \
+            fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', \
+            filtdir='./', dl=None, cosmo=None, useleitatt = False, \
             sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, sfhpar1range = None, sfhpar2range=None, emimodel='2018', emimetal=0.0, \
             velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.5,2.0]):
         
@@ -249,6 +250,7 @@ class sps_spec_fitter:
 
         #pre-compute attenuation curve for photometry
         self.k_cal = self._make_dusty(self.wl)
+        self.useleitatt = useleitatt
         
         #redshift the grid to be used in deriving predicted fluxes, also apply
         #flux correction to conserve energy
@@ -675,16 +677,28 @@ class sps_spec_fitter:
 
     def _make_dusty(self, wl):
         
+        n_wl = len(wl)
+        k_cal = np.zeros(n_wl, dtype=float)
+
         #compute attenuation assuming Calzetti+ 2000 law
         #single component 
-        n_wl = len(wl)
+
         R = 4.05
         div = wl.searchsorted(6300., side='left')
-        k_cal = np.zeros(n_wl, dtype=float)
         
+        #Longer than 6300
         k_cal[div:] = 2.659*( -1.857 + 1.04*(1e4/wl[div:])) + R
+        #Shorter than 6300
         k_cal[:div] = 2.659*(-2.156 + 1.509*(1e4/wl[:div]) - 0.198*(1e4/wl[:div])**2 + 0.011*(1e4/wl[:div])**3) + R
         
+        
+        #Use leiterer 2002 formula below 1500A
+        if self.useleitatt:
+          div = wl.searchsorted(1500., side='left')
+          #Shorter than 1500
+          k_cal[:div] = (5.472 + 0.671e4 / wl[:div] - 9.218e5 / wl[:div] ** 2 + 2.620e9 / wl[:div] ** 3)
+         
+        #Fix negative values with zeros
         zero = bisect_left(-k_cal, 0.)
         k_cal[zero:] = 0.
 
