@@ -476,7 +476,10 @@ for ind in range(nobj):
                 else:
                    sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
                    sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[5]))
-                
+            
+            f2 = pl.figure()    
+            f2.hist(10**sfr_samp, bins=40)
+            pl.show()
                 
             medlsfr  = np.percentile(sfr_samp, 50)
             perclsfr = np.percentile(sfr_samp, [16,50,84])
@@ -570,7 +573,7 @@ for ind in range(nobj):
                       spxrange[2*spid]   = (10**temp.log_wl[spid]).min()
                       spxrange[2*spid+1] = (10**temp.log_wl[spid]).max()
                    
-                   print('DEBUG: {} {}'.format(spyrange[2*spid], spyrange[2*spid+1]))                
+                   #print('DEBUG: {} {}'.format(spyrange[2*spid], spyrange[2*spid+1]))                
                    axsp[spid].axis([spxrange[2*spid],spxrange[2*spid+1],spyrange[2*spid], spyrange[2*spid+1]])               
                                       
                    axsp[spid].xaxis.set_major_locator(MultipleLocator(500))
