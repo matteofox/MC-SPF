@@ -47,6 +47,7 @@ grpinp.add_argument('--sfh',       default= 'exp', help='The form of the SFH, al
 grpinp.add_argument('--funit',     default= 'mJy', help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy')
 grpinp.add_argument('--emimetal',  default= 0.02,  type=float, help='Emission line metallicity Default = 0.02 (Solar value)')
 grpinp.add_argument('--emimodel',  default= '2017',  help="Emission line CLOUDY table (can only be '2017' or '2018') ")
+grpinp.add_argument('--useleitatt',dest='useleitatt',  action = 'store_true', help='If set, use the Leitherer et al. (2002) attenuation curve below 1500A.')
 
 grpfit = parser.add_argument_group('Fit related arguments')
 
@@ -360,7 +361,8 @@ for ind in range(nobj):
                polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
                sfh_age_par = sfh_age_par, dl=dl, sfhpar1range=sfhpar1range, \
                sfhpar2range=sfhpar2range,fescrange=fescrange,sigrange=sigrange,\
-               velrange=velrange,emimetal=args.emimetal,emimodel=args.emimodel) as temp:
+               velrange=velrange,emimetal=args.emimetal,emimodel=args.emimodel,\
+               useleitatt=args.useleitatt) as temp:
     
           
           if args.solver == 'ultranest':
@@ -397,7 +399,8 @@ for ind in range(nobj):
                 this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                 filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                 res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
-                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel) as temp:
+                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel, \
+                useleitatt=args.useleitatt) as temp:
                             
             a = pymultinest.Analyzer(n_params=ndim, outputfiles_basename=out_fmt.format(obj))
             values = a.get_equal_weighted_posterior()
@@ -725,7 +728,8 @@ for ind in range(nobj):
                 this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                 filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                 res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
-                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel) as temp:
+                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel, \
+                useleitatt=args.useleitatt) as temp:
                             
             a = pymultinest.Analyzer(n_params=ndim, outputfiles_basename=out_fmt.format(obj))
             values = a.get_equal_weighted_posterior()
