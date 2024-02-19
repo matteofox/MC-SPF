@@ -168,6 +168,7 @@ class sps_spec_fitter:
         #output grid
         self.mod_grid = np.zeros((self.n_tau, self.n_age, self.n_wl), dtype=float)
         self.age_grid = np.zeros((self.n_tau, self.n_age, 2),     dtype=float)
+        self.par_grid = np.zeros((self.n_tau, self.n_age, 2),     dtype=float)
         
         #grid where the fractional flux from young populations is stored
         self.fym_grid = np.zeros_like(self.mod_grid)
@@ -192,6 +193,9 @@ class sps_spec_fitter:
             self.mod_grid[par0_idx, par1_idx, :] = np.interp(self.wl, twl, mdata[:, 0]/mmass, left=0, right=0)
             self.fym_grid[par0_idx, par1_idx, :] = np.interp(self.wl, twl, mdata[:, 1], left=0, right=0)
             self.age_grid[par0_idx, par1_idx, :] = mage
+            self.par_grid[par0_idx, par1_idx, 0] = mmass
+            self.par_grid[par0_idx, par1_idx, 1] = mmetal
+            
 
         mfile.close() 
         
@@ -249,8 +253,8 @@ class sps_spec_fitter:
         self.fym_grid[~np.isfinite(self.fym_grid)] = 0.
 
         #pre-compute attenuation curve for photometry
-        self.k_cal = self._make_dusty(self.wl)
         self.useleitatt = useleitatt
+        self.k_cal = self._make_dusty(self.wl)
         
         #redshift the grid to be used in deriving predicted fluxes, also apply
         #flux correction to conserve energy
@@ -904,7 +908,8 @@ class sps_spec_fitter:
         else:
          return -1e70  
         
-
+    def _get_mstars(self, age, tau):
+        return self._bi_interp(self.par_grid, tau, age, self.grid_tau, self.grid_age)[0]
         
     def _get_clyman(self, spec, fesc): #compute number of Lyman continuum photons
         #spectrum in erg/s/cm2/A so it returns the flux of ionizing photons not the rate

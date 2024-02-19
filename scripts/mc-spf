@@ -475,14 +475,16 @@ for ind in range(nobj):
             for ind,ii in enumerate(rsamples):
                 tsamp = values[ii,:-1]
                 if sfh_type != 'custom':
-                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[5]))
+                   mstars = temp._get_mstars(tsamp[1], tsamp[0])
+                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[5])/mstars)
                 else:
                    sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
                    sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[5]))
             
-            f2 = pl.figure()    
-            f2.hist(10**sfr_samp, bins=40)
-            pl.show()
+            #DEBUG, comment when done
+            #f2, ax = pl.subplots(nrows=1, ncols=1)    
+            #ax.hist(10**sfr_samp, bins=25)
+            #pl.show()
                 
             medlsfr  = np.percentile(sfr_samp, 50)
             perclsfr = np.percentile(sfr_samp, [16,50,84])
