@@ -699,7 +699,7 @@ for ind in range(nobj):
             
             
             sfh_array = np.zeros((14000,args.nsampwrite))
-            age_array = np.zeros(args.nsampwrite, dtype=int)                            
+            age_array = np.zeros(args.nsampwrite, dtype=int) 
             for ind,ii in enumerate(rsamples):
                 tsamp = values[ii,:-1]
                 tflux, tphot = temp.reconstruct_phot(tsamp, temp.ndims)
@@ -709,12 +709,12 @@ for ind in range(nobj):
                 ax1.plot(temp.red_wl/1e4, temp.dusty_phot_old*10**tsamp[mstarind]*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='red' , alpha=0.1, lw=0.6, rasterized=args.rasterize)
                 
                 #Make this array in Myr
-                if temp.timeunit =='Myr':
-                   age_array = np.arange(int(tsamp[1]))
-                elif temp.timeunit =='Gyr':   
-                   age_array = np.arange(int(tsamp[1])*1000)/1000.
-                else:
-                   print('{Time unit {} not implemented yet.}'.format(temp.timeunit))
+                #if temp.timeunit =='Myr':
+                #   age_array = np.arange(int(tsamp[1]))
+                #elif temp.timeunit =='Gyr':   
+                #   age_array = np.arange(int(tsamp[1])*1000)/1000.
+                #else:
+                #   print('{Time unit {} not implemented yet.}'.format(temp.timeunit))
                 
                 if sfh_func != 'none':
                    tmp_sfh = sfh_func(temp.sfh_array, tsamp[1],tsamp[0])*10**(tsamp[mstarind])
@@ -982,12 +982,12 @@ for ind in range(nobj):
                 ax1.plot(temp.red_wl/1e4, temp.dusty_phot_old*10**tsamp[mstarind]*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='red' , alpha=0.1, lw=0.6, rasterized=args.rasterize)
                 
                 #Make this array in Myr
-                if temp.timeunit =='Myr':
-                   age_array = np.arange(int(tsamp[1]))
-                elif temp.timeunit =='Gyr':   
-                   age_array = np.arange(int(tsamp[1])*1000)/1000.
-                else:
-                   print('{Time unit {} not implemented yet.}'.format(temp.timeunit))
+                #if temp.timeunit =='Myr':
+                #   age_array = np.arange(int(tsamp[1]))
+                #elif temp.timeunit =='Gyr':   
+                #   age_array = np.arange(int(tsamp[1])*1000)/1000.
+                #else:
+                #   print('{Time unit {} not implemented yet.}'.format(temp.timeunit))
                 
                 if sfh_func != 'none':
                    tmp_sfh = sfh_func(temp.sfh_array, tsamp[1],tsamp[0])*10**(tsamp[mstarind])
