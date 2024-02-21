@@ -98,7 +98,8 @@ if __name__ == "__main__":
 	'win32'  : '.dll',
 	'cygwin' : '.dll',
     }.get(sys.platform, '.so')
-
+    
+    lib = cdll.LoadLibrary(libname)
     try:
       lib = cdll.LoadLibrary(libname)
     except:

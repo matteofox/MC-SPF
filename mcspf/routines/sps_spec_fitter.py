@@ -12,6 +12,7 @@ from bisect import bisect_left
 import astropy.units as u
 import astropy.stats as stats
 import sys
+import itertools
 from contextlib import contextmanager
 
 #Imports specific for the full version
@@ -23,49 +24,21 @@ from ..utils.readfilt  import init_filters, get_filter
 from ..utils.sincrebin import sincrebin_single_os as sincrebin
 from ..utils.cbroaden  import broaden
 
+from mcspf.routines import interp as _interp
+
 import matplotlib.pyplot as mp
 
 warnings.filterwarnings("ignore")
-
-@contextmanager
-def redir_stdout(to=os.devnull):
-    '''
-    import os
-
-    with stdout_redirected(to=filename):
-        print("from Python")
-        os.system("echo non-Python applications are also supported")
-    '''
-    fd = sys.stdout.fileno()
-
-    ##### assert that Python and C stdio write using the same file descriptor
-    ####assert libc.fileno(ctypes.c_void_p.in_dll(libc, "stdout")) == fd == 1
-
-    def _redirect_stdout(to):
-        sys.stdout.close() # + implicit flush()
-        os.dup2(to.fileno(), fd) # fd writes to 'to' file
-        sys.stdout = os.fdopen(fd, 'w') # Python writes to fd
-
-    with os.fdopen(os.dup(fd), 'w') as old_stdout:
-        with open(to, 'w') as file:
-            _redirect_stdout(to=file)
-        try:
-            yield # allow code to be run with the redirected stdout
-        finally:
-            _redirect_stdout(to=old_stdout) # restore stdout.
-                                            # buffering and flags such as
-                                            # CLOEXEC may be different
-
 
 
 class sps_spec_fitter:
 
     def __init__(self, redshift, phot_mod_file, flux_obs, eflux_obs, filter_list, lim_obs, \
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
-            fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', \
-            filtdir='./', dl=None, cosmo=None, useleitatt = False, \
-            sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, sfhpar1range = None, sfhpar2range=None, emimodel='2018', emimetal=0.0, \
-            velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.5,2.0]):
+            fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None, \
+            sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, sfhpar1range = None, sfhpar2range=None, sfhpar3range=None, \
+            emimodel='2018', emimetal=0.02, velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.,1.],\
+            useleitatt=False):
         
         """ Class for dealing with MultiNest fitting """
         
@@ -95,20 +68,22 @@ class sps_spec_fitter:
         
         #constants
         self.small_num = 1e-70
-        self.lsun = 3.839e33 #erg/s
+        self.lsun  = 3.839e33 #erg/s
         self.pc2cm = 3.08568e18 #pc to cm
         self.clight  = 2.997925e18 #A/s
-        self.h = 6.6262E-27 # Planck constant in erg s
+        self.h     = 6.6262E-27 # Planck constant in erg s
         self.Mpc_to_cm = u.Mpc.to(u.cm)
-        self.angstrom_to_km = u.angstrom.to(u.km)
         
         #Derive luminosity distance in Mpc
         if dl is None:
            dl = cosmo.luminosity_distance(redshift).value
+
+        self.flux_to_lum = (self.Mpc_to_cm*dl)**2*4.*np.pi #4pi*dl^2 in cm^2, not used here but in plotting
         
-        self.mag2cgs = np.log10(self.lsun/4.0/np.pi/(self.pc2cm*self.pc2cm)/100.)
-        self.dist = 4.0*np.pi*(self.pc2cm*self.pc2cm)*100.
-        self.flux_to_lum = (self.Mpc_to_cm*dl)**2*4.*np.pi #4pi*dl^2 in cm^2
+        #Legacy, not used here
+        #self.mag2cgs = np.log10(self.lsun/4.0/np.pi/(self.pc2cm*self.pc2cm)/100.)
+        #self.dist = 4.0*np.pi*(self.pc2cm*self.pc2cm)*100.
+        #self.angstrom_to_km = u.angstrom.to(u.km)
         
         #some derived parameters
         self.gal_age = cosmo.age(self.redshift).value #In Gyr here, will be modified later if necessary
@@ -119,6 +94,7 @@ class sps_spec_fitter:
         
         mfile = fits.open(phot_mod_file)
         num_ext = len(mfile)
+
         try:
           self.mod_lib = mfile[0].header['MODLIB']
         except:
@@ -138,45 +114,44 @@ class sps_spec_fitter:
         self.red_wl = self.wl * (1.+self.redshift)
         self.n_wl = len(self.wl)
         
-        #Done with wavelength, now pass through extensions to get grid parameters
-        ext_tau, ext_age, ext_metal = [],[],[]
-        for ii in range(1,num_ext):
-            if ii==1:
-             try:
-                self.timeunit = mfile[ii].header['AGEUNIT']
-             except:
-                self.timeunit = 'Myr'
-                print('      WARNING: AGEUNIT keyword not found. Using Myr')
-            
-            tau   = mfile[ii].header[sfh_pars[0]] 
-            age   = mfile[ii].header[sfh_pars[1]] 
-            ext_tau.append(float(tau))
-            ext_age.append(float(age))
 
-        #If model units are in Myr modify cosmo age accordingly
-        if self.timeunit == 'Myr':
-           self.gal_age *= 1000
+        #Define number of pars in model grid, and the necessary arrays to store the values
+        self.sfh_pars = sfh_pars
+        self.define_model_grid(mfile, num_ext)
+
+        #self.mod_flux_to_lum = 1.19649518E40 #4*pi*(10pc)**2
         
-        self.grid_tau = np.unique(ext_tau)
-        self.grid_age = np.unique(ext_age)
-                
-        self.n_tau = len(self.grid_tau)
-        self.n_age = len(self.grid_age)
+        #Generate output grid and define interpolation routine to be used
+        if self.sfh_npars==1:
+         self.mod_grid = np.zeros((self.par_len[0], self.n_wl), dtype=float)
+         self.age_grid = np.zeros((self.par_len[0], 2),         dtype=float)
+         self.phy_grid = np.zeros((self.par_len[0], 2),         dtype=float) #extra parameters grid
+         self.interp = _interp.interp
+        elif self.sfh_npars==2:
+         self.mod_grid = np.zeros((self.par_len[0], self.par_len[1], self.n_wl), dtype=float)
+         self.age_grid = np.zeros((self.par_len[0], self.par_len[1], 2),         dtype=float)
+         self.phy_grid = np.zeros((self.par_len[0], self.par_len[1], 2),         dtype=float)
+         self.interp = _interp.bi_interp
+        elif self.sfh_npars==3:
+         self.mod_grid = np.zeros((self.par_len[0], self.par_len[1], self.par_len[2], self.n_wl), dtype=float)
+         self.age_grid = np.zeros((self.par_len[0], self.par_len[1], self.par_len[2], 2),         dtype=float)
+         self.phy_grid = np.zeros((self.par_len[0], self.par_len[1], 2),         dtype=float)
+         self.interp = _interp.tri_interp
+        else:
+          print('ERROR: We cannot handle SFH grids with more than 3 dimensions. Abort')
+          exit()
         
-        self.mod_flux_to_lum = 1.196495E40
-        
-        #output grid
-        self.mod_grid = np.zeros((self.n_tau, self.n_age, self.n_wl), dtype=float)
-        self.age_grid = np.zeros((self.n_tau, self.n_age, 2),     dtype=float)
-        self.par_grid = np.zeros((self.n_tau, self.n_age, 2),     dtype=float)
-        
-        #grid where the fractional flux from young populations is stored
+        #Grid where the fractional flux from young populations is stored
         self.fym_grid = np.zeros_like(self.mod_grid)
         
         for ii in range(1,num_ext):            
+            
             mdata  = np.array(mfile[ii].data,  dtype=float)
+            
             mmass  = mfile[ii].header['MSTAR']
             mmetal = mfile[ii].header['METAL']
+            
+            #This should be cleaned up
             if sfh_age_par == -1:
                mage = mfile[ii].header['AGE']
             elif sfh_age_par >=0 and sfh_age_par<=10:
@@ -184,56 +159,38 @@ class sps_spec_fitter:
             else:
                mage = sfh_age_par      
             
-            mpar0   = mfile[ii].header[sfh_pars[0]] 
-            mpar1   = mfile[ii].header[sfh_pars[1]] 
+            pos_tuple = []
+            for jj in range(self.sfh_npars):
+              tmppar = mfile[ii].header[sfh_pars[jj]]
+              pos_tuple.append(np.where(tmppar == self.grid_arr[jj])[0])
             
-            par0_idx = np.where(mpar0 == self.grid_tau)[0]
-            par1_idx = np.where(mpar1 == self.grid_age)[0]
-            
-            self.mod_grid[par0_idx, par1_idx, :] = np.interp(self.wl, twl, mdata[:, 0]/mmass, left=0, right=0)
-            self.fym_grid[par0_idx, par1_idx, :] = np.interp(self.wl, twl, mdata[:, 1], left=0, right=0)
-            self.age_grid[par0_idx, par1_idx, :] = mage
-            self.par_grid[par0_idx, par1_idx, 0] = mmass
-            self.par_grid[par0_idx, par1_idx, 1] = mmetal
-            
+            pos_tuple.append(Ellipsis)
+            pos_tuple = tuple(pos_tuple)
+             
+            self.mod_grid[pos_tuple] = np.interp(self.wl, twl, mdata[:, 0]/mmass, left=0, right=0)
+            self.fym_grid[pos_tuple] = np.interp(self.wl, twl, mdata[:, 1], left=0, right=0)
+            self.age_grid[pos_tuple] = mage
+            self.phy_grid[pos_tuple] = mmass #TODO ALLOW FOR MULTIPLE PARS TO BE STORED
 
         mfile.close() 
         
         self.age_max = int(np.nanmax(self.age_grid))
-        self.sfh_grid = np.zeros((self.n_tau, self.n_age, self.age_max), dtype=float)
         self.sfh_array = np.ones((self.age_max), dtype=float)
+        if self.sfh_npars==1:
+         self.sfh_grid = np.zeros((self.par_len[0], self.age_max), dtype=float)
+        elif self.sfh_npars==2:
+         self.sfh_grid = np.zeros((self.par_len[0], self.par_len[1], self.age_max), dtype=float)
+        elif self.sfh_npars==3:
+         self.sfh_grid = np.zeros((self.par_len[0], self.par_len[1], self.par_len[2], self.age_max), dtype=float)
+         
+        #TO HERE
         
         if sfh_type=='custom':
            
            sfh_mod_file = phot_mod_file.replace('.fits','_sfh.fits')
-           print('      INFO: Reading SFH file: {}'.format(sfh_mod_file))
+           print('      INFO: Reading custom SFH file: {}'.format(sfh_mod_file))
            if os.path.isfile(sfh_mod_file):
-             sfile = fits.open(sfh_mod_file)
-             
-             for ii in range(1,num_ext):            
-             
-               sdata   = np.array(sfile[ii].data,  dtype=float)
-               slength = sfile[ii].header['NAXIS2']
-               spar0    = sfile[ii].header[sfh_pars[0]] 
-               spar1    = sfile[ii].header[sfh_pars[1]] 
-               
-               par0_idx = np.where(spar0 == self.grid_tau)[0]
-               par1_idx = np.where(spar1 == self.grid_age)[0]
-               
-               if slength>=self.age_max:
-                 self.sfh_grid[par0_idx, par1_idx, :] = sdata[:self.age_max,1]
-               else:
-                 self.sfh_grid[par0_idx, par1_idx, :slength] = sdata[:,1]
-                 ratio_extrap = sdata[-1,1]/sdata[-2,1]
-                 for ss in range(slength, np.min((slength+1000,self.age_max-1))):
-                    self.sfh_grid[par0_idx, par1_idx,ss] = self.sfh_grid[par0_idx, par1_idx,ss-1]*ratio_extrap
-               
-               self.sfh_array = self.sfh_grid[0, 0,:]
-               #self.sfh_grid[par0_idx, par1_idx, slength:] = sdata[-1,1]   
-               
-               #mp.plot(np.arange(14000),self.sfh_grid[tau_idx,age_idx,:])
-               #mp.plot(sdata[:,1])
-               #mp.show()           
+             self.read_sfh_grid(sfh_mod_file, num_ext)
         
         if (self.mod_lib).lower() == 'bc03':
             #some information on the BC03 spectral resolution (FWHM is 3A in the optical)
@@ -403,38 +360,13 @@ class sps_spec_fitter:
         else:
           self.n_spec = 0
         
-        if sfhpar1range is None:
-            if sfh_pars[0].upper() =='AGE':
-              maxval_valid = np.min((self.grid_tau.max(), self.gal_age))
-            else:
-              maxval_valid = self.grid_tau.max()
-            self.sfhpar1_lims = np.array((self.grid_tau.min(), maxval_valid))
-        else:
-            #Verify validity of user requested values
-            minval_valid = np.max((self.grid_tau.min(), sfhpar1range[0]))
-            if sfh_pars[0].upper() =='AGE':
-              maxval_valid = np.min((self.grid_tau.max(), sfhpar1range[1], self.gal_age))
-            else:
-              maxval_valid = np.min((self.grid_tau.max(), sfhpar1range[1]))
-            self.sfhpar1_lims = np.array((minval_valid, maxval_valid))
-        print('      INFO: SFH PAR1 range is: {:.1f} - {:.1f}'.format(self.sfhpar1_lims[0], self.sfhpar1_lims[1]))
-
-        if sfhpar2range is None:
-            if sfh_pars[1].upper() =='AGE':
-              maxval_valid = np.min((self.grid_age.max(), self.gal_age))
-            else:
-              maxval_valid = self.grid_age.max()
-            self.sfhpar2_lims = np.array((self.grid_age.min(), maxval_valid))
-        else:
-            #Verify validity of user requested values
-            minval_valid = np.max((self.grid_age.min(), sfhpar2range[0]))
-            if sfh_pars[1].upper() =='AGE':
-              maxval_valid = np.min((self.grid_age.max(), sfhpar2range[1], self.gal_age))
-            else:
-              maxval_valid = np.min((self.grid_age.max(), sfhpar2range[1]))
-            self.sfhpar2_lims = np.array((minval_valid, maxval_valid))
-        print('      INFO: SFH PAR2 range is: {:.1f} - {:.1f}'.format(self.sfhpar2_lims[0], self.sfhpar2_lims[1]))
-            
+        sfhparranges = [sfhpar1range, sfhpar2range, sfhpar3range]
+        self.bounds = []
+        
+        for pp in range(self.sfh_npars):
+            this_sfhpar_lims = self.sanitize_sfhpar_lims(sfhparranges[pp],pp)
+            self.bounds.append(this_sfhpar_lims)
+                            
         self.av_lims  = np.array((0., 5.))
         self.ext_lims = np.array((0., 5.))
         self.alpha_lims = np.array((self.dh_alpha[0], self.dh_alpha[-1]))
@@ -454,12 +386,102 @@ class sps_spec_fitter:
             print('      INFO: Custom stellar velocity range is: {} - {}'.format(velrange[0], velrange[1]))
 
         
-        self.bounds = [self.sfhpar1_lims, self.sfhpar2_lims, self.av_lims, \
+        self.bounds += [self.av_lims, \
                 self.ext_lims, self.alpha_lims,  self.mass_lims, \
                 self.sig_lims, self.vel_lims, self.emmsig_lims, self.emmage_lims,\
                 self.emmion_lims, self.fesc_lims, self.lnf_lims, self.lnf_lims]
-                
+        
         self.ndims = len(self.bounds)   
+        
+    def sanitize_sfhpar_lims(self, sfhparrange, ind):
+    
+        if sfhparrange is None:
+            if self.sfh_pars[0].upper() =='AGE':
+              maxval_valid = np.min((self.grid_arr[ind].max(), self.gal_age))
+            else:
+              maxval_valid = self.grid_arr[ind].max()
+            self.sfhpar_lims.append(np.array((self.grid_arr[ind].min(), maxval_valid)))
+        else:
+            #Verify validity of user requested values
+            minval_valid = np.max((self.grid_arr[ind].min(), sfhparrange[0]))
+            if self.sfh_pars[0].upper() =='AGE':
+              maxval_valid = np.min((self.grid_arr[ind].max(), sfhparrange[1], self.gal_age))
+            else:
+              maxval_valid = np.min((self.grid_arr[ind].max(), sfhparrange[1]))
+            self.sfhpar_lims.append(np.array((minval_valid, maxval_valid)))
+            
+        print('      INFO: SFH PAR{} range is: {:.1f} - {:.1f}'.format(ind+1, self.sfhpar_lims[ind][0], self.sfhpar_lims[ind][1]))
+        return self.sfhpar_lims[ind]
+
+
+    def define_model_grid(self, mfile, next):
+    
+        #Pass through extensions to get grid parameters
+        self.sfh_npars = len(self.sfh_pars)
+        ext_sfhpar1, ext_sfhpar2, ext_sfhpar3, ext_metal = [],[],[],[]
+        
+        for ii in range(1,next):
+            if ii==1:
+             try:
+                self.timeunit = mfile[ii].header['AGEUNIT']
+             except:
+                self.timeunit = 'Myr'
+                print('      WARNING: AGEUNIT keyword not found. Using Myr')
+            
+            _par1   = mfile[ii].header[self.sfh_pars[0]]
+            ext_sfhpar1.append(float(_par1))
+ 
+            if self.sfh_npars>=2:
+               _par2   = mfile[ii].header[self.sfh_pars[1]] 
+               ext_sfhpar2.append(float(_par2))
+            
+            if self.sfh_npars>=3:
+              _par3   = mfile[ii].header[self.sfh_pars[2]] 
+              ext_sfhpar3.append(float(_par3))
+
+        #If model units are in Myr modify cosmo age accordingly
+        if self.timeunit == 'Myr':
+           self.gal_age *= 1000
+        
+        self.grid_arr  = [np.unique(ext_sfhpar1),np.unique(ext_sfhpar2),np.unique(ext_sfhpar3)]
+        self.sfhpar_lims = []
+                
+        self.par_len = [len(self.grid_arr[k]) for k in range(self.sfh_npars)]
+
+
+    def read_sfh_grid(self, sfh_mod_file, num_ext):
+        
+        sfile = fits.open(sfh_mod_file)
+        for ii in range(1,num_ext):            
+        
+          sdata   = np.array(sfile[ii].data,  dtype=float)
+          
+          slength = sfile[ii].header['NAXIS2']
+          
+          pos_tuple = []
+          for jj in range(self.sfh_npars):
+              tmppar = sfile[ii].header[self.sfh_pars[jj]]
+              pos_tuple.append(np.where(tmppar == self.grid_arr[jj])[0])
+            
+          pos_tuple.append(Ellipsis)
+          pos_tuple = tuple(pos_tuple)
+             
+          if slength>=self.age_max:
+            tmparr = sdata[:self.age_max,1]
+          else:
+            tmparr = np.zeros(self.age_max)
+            tmparr[:slength] = sdata[:,1]
+            ratio_extrap = sdata[-1,1]/sdata[-2,1]
+            for ss in range(slength, np.min((slength+1000,self.age_max-1))):
+               tmparr[ss] = tmparr[ss-1]*ratio_extrap
+          
+          self.sfh_grid[pos_tuple] = tmparr
+          self.sfh_array = self.sfh_grid[0, 0,:]
+          
+          #mp.plot(np.arange(14000),tmparr)
+          #mp.plot(sdata[:,1])
+          #mp.show()           
+        
         
     def spec_init(self, specfile, resfile, polymax, cropspec):
 
@@ -560,19 +582,28 @@ class sps_spec_fitter:
         #mp.show()
                 
         #set up storage for log models
-        log_spec_grid = np.zeros((self.n_tau, self.n_age, n_model_wl), dtype=float)
-        log_fysp_grid = np.zeros((self.n_tau, self.n_age, n_model_wl), dtype=float)
+        if self.sfh_npars==1:
+         log_spec_grid = np.zeros((self.par_len[0], n_model_wl), dtype=float)
+         log_fysp_grid = np.zeros((self.par_len[0], n_model_wl), dtype=float)
+         tmprange = [np.arange(self.n_par1)]
+        elif self.sfh_npars==2:
+         log_spec_grid = np.zeros((self.par_len[0], self.par_len[1], n_model_wl), dtype=float)
+         log_fysp_grid = np.zeros((self.par_len[0], self.par_len[1], n_model_wl), dtype=float)
+         tmprange = [np.arange(self.par_len[0]), np.arange(self.par_len[1])]
+        elif self.sfh_npars==3:
+         log_spec_grid = np.zeros((self.par_len[0], self.par_len[1], self.par_len[2], n_model_wl), dtype=float)
+         log_fysp_grid = np.zeros((self.par_len[0], self.par_len[1], self.par_len[2], n_model_wl), dtype=float)
+         tmprange = [np.arange(self.par_len[0]), np.arange(self.par_len[1]), np.arange(self.par_len[2])]
         
-        cnt = 0
-        for jj in range(self.n_tau):
-            for kk in range(self.n_age):
-                 this_templ = self.mod_grid[jj,kk,use_wl]  
-                 this_young = self.fym_grid[jj,kk,use_wl] * np.copy(this_templ)
-                 log_spec  = np.interp(10**log_model_wl,  model_spec_wl, this_templ/(1+self.redshift))
-                 log_young = np.interp(10**log_model_wl,  model_spec_wl, this_young/(1+self.redshift))
+        for it in itertools.product(*tmprange):
+            fullit = it + (Ellipsis,)
+            this_templ = self.mod_grid[fullit]  
+            this_young = self.fym_grid[fullit] * this_templ
+            log_spec  = np.interp(10**log_model_wl,  model_spec_wl, this_templ[use_wl]/(1+self.redshift))
+            log_young = np.interp(10**log_model_wl,  model_spec_wl, this_young[use_wl]/(1+self.redshift))
 
-                 log_spec_grid[jj,kk,:] = log_spec
-                 log_fysp_grid[jj,kk,:] = np.copy(log_young)/np.copy(log_spec)
+            log_spec_grid[fullit] = log_spec
+            log_fysp_grid[fullit] = log_young/log_spec
         
 
         #cut down emission line arrays for the spectral grid
@@ -695,13 +726,13 @@ class sps_spec_fitter:
         #Shorter than 6300
         k_cal[:div] = 2.659*(-2.156 + 1.509*(1e4/wl[:div]) - 0.198*(1e4/wl[:div])**2 + 0.011*(1e4/wl[:div])**3) + R
         
-        
-        #Use leiterer 2002 formula below 1500A
+
+        #IF REQUESTED Use leiterer 2002 formula below 1500A
         if self.useleitatt:
           div = wl.searchsorted(1500., side='left')
           #Shorter than 1500
           k_cal[:div] = (5.472 + 0.671e4 / wl[:div] - 9.218e5 / wl[:div] ** 2 + 2.620e9 / wl[:div] ** 3)
-         
+
         #Fix negative values with zeros
         zero = bisect_left(-k_cal, 0.)
         k_cal[zero:] = 0.
@@ -717,52 +748,6 @@ class sps_spec_fitter:
                 
         #Return 0.4*A(lam)/A(V)
         return 0.4*(k_cal+ k_bump)/R
- 
-    def _tri_interp(self, data_cube, value1, value2, value3, array1, array2, array3):
-        #locate vertices
-        ilo = bisect_left(array1, value1)-1
-        jlo = bisect_left(array2, value2)-1
-        klo = bisect_left(array3, value3)-1
-
-        di = (value1 - array1[ilo])/(array1[ilo+1]-array1[ilo])
-        dj = (value2 - array2[jlo])/(array2[jlo+1]-array2[jlo])
-        dk = (value3 - array3[klo])/(array3[klo+1]-array3[klo])
-
-        interp_out = data_cube[ilo,jlo,klo,:]       * (1.-di)*(1.-dj)*(1.-dk) + \
-                     data_cube[ilo,jlo,klo+1,:]     * (1.-di)*(1.-dj)*dk + \
-                     data_cube[ilo,jlo+1,klo,:]     * (1.-di)*dj*(1.-dk) + \
-                     data_cube[ilo,jlo+1,klo+1,:]   * (1.-di)*dj*dk + \
-                     data_cube[ilo+1,jlo,klo,:]     * di*(1.-dj)*(1.-dk) + \
-                     data_cube[ilo+1,jlo,klo+1,:]   * di*(1.-dj)*dk + \
-                     data_cube[ilo+1,jlo+1,klo,:]   * di*dj*(1.-dk) + \
-                     data_cube[ilo+1,jlo+1,klo+1,:] * di*dj*dk
-
-        return interp_out
-
-    def _bi_interp(self, data_cube, value1, value2, array1, array2):
-        #locate vertices
-        ilo = bisect_left(array1, value1)-1
-        jlo = bisect_left(array2, value2)-1
-
-        di = (value1 - array1[ilo])/(array1[ilo+1]-array1[ilo])
-        dj = (value2 - array2[jlo])/(array2[jlo+1]-array2[jlo])
-
-        interp_out = data_cube[ilo,jlo,:]     * (1.-di)*(1.-dj) + \
-                     data_cube[ilo,jlo+1,:]   * (1.-di)*dj + \
-                     data_cube[ilo+1,jlo,:]   * di*(1.-dj) + \
-                     data_cube[ilo+1,jlo+1,:] * di*dj
-
-        return interp_out
-
-    def _interp(self, data_cube, value, array):
-        #locate vertices
-        ilo = bisect_left(array, value)-1
-        di = (value - array[ilo])/(array[ilo+1]-array[ilo])
-
-        interp_out = data_cube[ilo,:]   * (1.-di) + \
-                     data_cube[ilo+1,:] * di
-
-        return interp_out
 
 
     def _get_filters(self):
@@ -782,8 +767,7 @@ class sps_spec_fitter:
             fobj = get_filter(filters_db, filt)
             fwl, ftrans = fobj.transmission
             ftrans = np.maximum(ftrans, 0.)
-            trans_interp = np.asarray(np.interp(self.red_wl, fwl, \
-                    ftrans, left=0., right=0.), dtype=float) 
+            trans_interp = np.asarray(np.interp(self.red_wl, fwl, ftrans, left=0., right=0.), dtype=float) 
 
             #normalize transmission
             ttrans = np.trapz(np.copy(trans_interp)*self.red_wl, self.red_wl) #for integrating f_lambda
@@ -797,20 +781,21 @@ class sps_spec_fitter:
             if 'irac' in filt or 'pacs' in filt or 'spire' in filt or 'iras' in filt: 
                 td = np.trapz(((fobj.lambda_eff/self.red_wl)**(1.))*ntrans*self.red_wl, self.red_wl)
                 ntrans = ntrans/max(1e-70,td)
-
+            
+            #Calculate pivot wavelength following equation lam_pivot from SVO filter service
+            pivot_wl = np.sqrt(np.trapz(ntrans, self.red_wl) / np.trapz(ntrans / self.red_wl**2, self.red_wl))
             bands[ii,:] = ntrans
-            pivot[ii] = fobj.lambda_eff
+            pivot[ii] = pivot_wl
         
         return bands, pivot
 
     def _get_mag_single(self, spec, ret_flux=True):
         
-        #compute observed frame magnitudes and fluxes, return both
+        #compute observed frame magnitudes and fluxes, return what has been requested
         
         tflux = np.zeros(self.n_bands, dtype=float)
 
-        getmag_spec(self.red_wl, np.einsum('ji,i->ij', self.bands, \
-                spec*self.red_wl), self.n_bands, tflux)
+        getmag_spec(self.red_wl, np.einsum('ji,i->ij', self.bands, spec*self.red_wl), self.n_bands, tflux)
         
         if not ret_flux:
             tmag = -2.5*np.log10(tflux*self.fscale) - 48.6
@@ -832,7 +817,6 @@ class sps_spec_fitter:
         if all(b[0] <= v <= b[1] for v, b in zip(p, self.bounds)):
             
             pav = 0
-            
             if self.Gpriors is not None:
               for par in range(ndim):
                 if self.Gpriors[2*par] != 'none' and self.Gpriors[(2*par)+1] != 'none':
@@ -841,11 +825,12 @@ class sps_spec_fitter:
                   pav  +=  -0.5*(((p[par]-val)/sig)**2 + np.log(2.*np.pi*sig**2))
             
             if self.priorAext is not None:
-            
-               aval = self.priorAext[0]*p[2] #[1.17,0.01]
+               
+               #Careful here, Av and Avext are the first two pars of the array after the sfh pars
+               aval = self.priorAext[0]*p[self.sfh_npars] #[1.17,0.01]
                sav  = self.priorAext[1]
-               pav  +=  -0.5*(((p[3]-aval)/sav)**2 + np.log(2.*np.pi*sav**2))
-                             
+               pav  +=  -0.5*(((p[self.sfh_npars+1]-aval)/sav)**2 + np.log(2.*np.pi*sav**2))
+            
             return pav
 
         return -np.inf
@@ -863,7 +848,7 @@ class sps_spec_fitter:
             if np.all(model_spec == 0.):
                 return -np.inf
 
-            ispec2 = 1./((self.log_noise[ss]*np.exp(p[12+ss]))**2)
+            ispec2 = 1./((self.log_noise[ss]*np.exp(p[self.sfh_npars+10+ss]))**2)
 
             spec_lhood += -0.5*np.nansum((ispec2*(self.log_obj[ss]-model_spec)**2 - np.log(ispec2) + np.log(2.*np.pi))[self.goodpix_spec[ss]])
                   
@@ -908,9 +893,11 @@ class sps_spec_fitter:
         else:
          return -1e70  
         
-    def _get_mstars(self, age, tau):
-        return self._bi_interp(self.par_grid, tau, age, self.grid_tau, self.grid_age)[0]
-        
+    def _get_mstars(self, p):
+    
+        isfh = tuple(p[:self.sfh_npars])
+        return self.interp(self.phy_grid, isfh, self.grid_arr)[0]
+
     def _get_clyman(self, spec, fesc): #compute number of Lyman continuum photons
         #spectrum in erg/s/cm2/A so it returns the flux of ionizing photons not the rate
         lycont_spec = np.interp(self.lycont_wls, self.wl, spec) 
@@ -939,7 +926,7 @@ class sps_spec_fitter:
         obs_kms = np.r_[self.obs_kms[spid],self.obs_kms[spid][-1]]
         sigma_pix = np.sqrt(sigma**2+obs_kms**2)/self.kms2pix[spid]
 
-        temp_emm_scales = self._bi_interp(self.log_emm_scales[spid], emm_ion, emm_age, self.emm_ions, self.emm_ages) 
+        temp_emm_scales = _interp.bi_interp(self.log_emm_scales[spid], (emm_ion, emm_age), (self.emm_ions, self.emm_ages)) 
         
         #t1 = np.where((self.log_emm_wls[spid]/(1+self.redshift) > 1215.5) & (self.log_emm_wls[spid]/(1+self.redshift) < 1215.9))
         #t2 = np.where((self.log_emm_wls[spid]/(1+self.redshift) > 1402) & (self.log_emm_wls[spid]/(1+self.redshift) < 1404))
@@ -953,12 +940,15 @@ class sps_spec_fitter:
 
     def reconstruct_spec(self, p, ndim, spid, retall=False):
         
-        #Parameters
-        itau, iage, iav, iav_ext, _, ilmass, isig, ivel,  isig_gas, iage_gas, iion_gas, ifesc, ilnf0, ilnf1 = [p[x] for x in range(ndim)]
+        #Parameters: SFHpars, Av, Av_ext, Alpha, Lmass, DUMMY, DUMMY, DUMMY, AgeGas, IonGas, Fesc, DUMMY, DUMMY
+        #           sfh_npars    0      1     2     3      4       5      6      7       8      9      10      11
+        
+        isfh = tuple(p[:self.sfh_npars])
+        iav, iav_ext, _, ilmass, isig, ivel, isig_gas, iage_gas, iion_gas, ifesc, ilnf0, ilnf1 = p[self.sfh_npars:ndim] 
         
         #interpolate the full photometric grid (non redshifted for lyman continuum photons)
-        spec_model = self._bi_interp(self.mod_grid, itau, iage, self.grid_tau, self.grid_age)
-        frac_model = self._bi_interp(self.fym_grid, itau, iage, self.grid_tau, self.grid_age)
+        spec_model = self.interp(self.mod_grid, isfh, self.grid_arr)
+        frac_model = self.interp(self.fym_grid, isfh, self.grid_arr)
 
         #get number of lyman continuum photons
         self.clyman_young, temp_young = self._get_clyman(spec_model*frac_model, ifesc)
@@ -972,8 +962,8 @@ class sps_spec_fitter:
         dusty_emm = ((10**(-iav*self.spec_k_cal[spid]) * emm_old) + (10**(-(iav+iav_ext)*self.spec_k_cal[spid]) * emm_young))
         
         #interpolate the spectral model grid to given values (this is in the observed frame, i.e. redshifted)
-        hr_spec_model = self._bi_interp(self.log_spec_grid[spid], itau, iage, self.grid_tau, self.grid_age)
-        hr_frac_model = self._bi_interp(self.log_fysp_grid[spid], itau, iage, self.grid_tau, self.grid_age)
+        hr_spec_model = self.interp(self.log_spec_grid[spid], isfh, self.grid_arr)
+        hr_frac_model = self.interp(self.log_fysp_grid[spid], isfh, self.grid_arr)
                 
         #attenuate the continuum model and convolve to given dispersion
         spec_young = self._vel_convolve_fft(hr_spec_model*hr_frac_model, isig, ivel, spid)[:self.npix_obj[spid]]
@@ -1022,26 +1012,30 @@ class sps_spec_fitter:
 
 
     def reconstruct_phot(self, p, ndim):
-        #parameters
-        itau, iage, iav, iav_ext, ialpha, ilmass, _, _, _, iage_gas, iion_gas, ifesc, _, _ = [p[x] for x in range(ndim)]
+
+        #Parameters: SFHpars, Av, Av_ext, Alpha, Lmass, DUMMY, DUMMY, DUMMY, AgeGas, IonGas, Fesc, DUMMY, DUMMY
+        #                      0      1     2     3      4       5      6      7       8      9      10      11
+        
+        isfh = tuple(p[:self.sfh_npars])
+        iav, iav_ext, ialpha, ilmass, _, _, _, iage_gas, iion_gas, ifesc, _, _ = p[self.sfh_npars:ndim] 
         
         #interpolate the full photometric grid (non redshifted for lyman continuum photons)
-        spec_model = self._bi_interp(self.mod_grid, itau, iage, self.grid_tau, self.grid_age)
-        frac_model = self._bi_interp(self.fym_grid, itau, iage, self.grid_tau, self.grid_age)
+        spec_model = self.interp(self.mod_grid, isfh, self.grid_arr)
+        frac_model = self.interp(self.fym_grid, isfh, self.grid_arr)
 
         #get number of lyman continuum photons
         self.clyman_young, temp_young   = self._get_clyman(spec_model*frac_model, ifesc)
         self.clyman_old,   temp_old     = self._get_clyman(spec_model*(1.-frac_model), ifesc)
         
         #### Include nebular emission ####
-        iemm_lines = self._bi_interp(self.emm_lines_all, iion_gas, iage_gas, self.emm_ions, self.emm_ages) 
+        iemm_lines = _interp.bi_interp(self.emm_lines_all, (iion_gas, iage_gas), (self.emm_ions, self.emm_ages)) 
         emm_young, emm_old = self._get_nebular(iemm_lines)
 
         #Send model to observed frame, scale flux down and wave up (wave is pre computed as self.wl_red)
         tot_young = (temp_young+emm_young) / (1+self.redshift)
         tot_old   = (temp_old  +emm_old) / (1+self.redshift)
         
-        #attenuate photometry spectrum, then compute fluxes given input bands
+        #attenuate photometry spectrum, k_cal is precomputed in the rest frame as it should be
         self.dusty_phot_young = (10**(-(iav+iav_ext)*self.k_cal) * (tot_young))
         self.dusty_phot_old   = (10**(-iav*self.k_cal) * (tot_old))
         self.dusty_phot       = self.dusty_phot_young + self.dusty_phot_old
@@ -1051,7 +1045,7 @@ class sps_spec_fitter:
         lbol_att = np.trapz(self.dusty_phot, self.wl)
 
         dust_emm = (lbol_init - lbol_att)
-        tdust_phot = self._interp(self.dh_dustemm, ialpha, self.dh_alpha)
+        tdust_phot = _interp.interp(self.dh_dustemm, (ialpha,), (self.dh_alpha,))
 
         #remove stellar component
         mask_pixels = (self.wl >= 2.5e4) & (self.wl <= 3e4)
@@ -1090,11 +1084,11 @@ class sps_spec_fitter:
 
     def reconstruct_sfh(self, p, ndim):
         #parameters
-        ipar0, ipar1, _, _, _, _, _, _, _, _, _, _, _, _ = [p[x] for x in range(ndim)]
+        isfh = tuple(p[:self.sfh_npars])
         
         #interpolate the sfh grid
-        sfh_interp = self._bi_interp(self.sfh_grid, ipar0, ipar1, self.grid_tau, self.grid_age)
-        age_interp = self._bi_interp(self.age_grid, ipar0, ipar1, self.grid_tau, self.grid_age)
+        sfh_interp = self.interp(self.sfh_grid, isfh, self.grid_arr)
+        age_interp = self.interp(self.age_grid, isfh, self.grid_arr)
 
         return sfh_interp, age_interp[0]
     
