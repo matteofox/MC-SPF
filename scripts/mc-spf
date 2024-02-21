@@ -133,6 +133,7 @@ grpinp.add_argument('--sfh',       default= 'exp', help='The form of the SFH, al
 grpinp.add_argument('--funit',     default= 'mJy', help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy')
 grpinp.add_argument('--emimetal',  default= 0.02,  type=float, help='Emission line metallicity Default = 0.02 (Solar value)')
 grpinp.add_argument('--emimodel',  default= '2017',  help="Emission line CLOUDY table (can only be '2017' or '2018') ")
+grpinp.add_argument('--useleitatt',dest='useleitatt',  action = 'store_true', help='If set, use the Leitherer et al. (2002) attenuation curve below 1500A.')
 
 grpfit = parser.add_argument_group('Fit related arguments')
 
@@ -468,7 +469,8 @@ for ind in range(nobj):
                polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
                sfh_age_par = sfh_age_par, dl=dl, sfhpar1range=sfhpar1range, \
                sfhpar2range=sfhpar2range,sfhpar3range=sfhpar3range,fescrange=fescrange,sigrange=sigrange,\
-               velrange=velrange,emimetal=args.emimetal,emimodel=args.emimodel) as temp:
+               velrange=velrange,emimetal=args.emimetal,emimodel=args.emimodel,\
+               useleitatt=args.useleitatt) as temp:
     
           
           if args.solver == 'ultranest':
@@ -505,7 +507,8 @@ for ind in range(nobj):
                 this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                 filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                 res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
-                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel) as temp:
+                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel,\
+                useleitatt=args.useleitatt) as temp:
                             
             a = pymultinest.Analyzer(n_params=temp.ndims, outputfiles_basename=out_fmt.format(obj))
             values = a.get_equal_weighted_posterior()
@@ -580,11 +583,12 @@ for ind in range(nobj):
             
             for ind,ii in enumerate(rsamples):
                 tsamp = values[ii,:-1]
+                mstars = temp._get_mstars(tsamp)
                 if sfh_type != 'custom':
-                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[mstarind]))
+                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[mstarind])/mstars)
                 else:
                    sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, temp.ndims)
-                   sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[mstarind]))
+                   sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[mstarind])/mstars)
                 
                 
             medlsfr  = np.percentile(sfr_samp, 50)
@@ -789,7 +793,8 @@ for ind in range(nobj):
                 this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                 filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                 res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
-                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel) as temp:
+                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel,\
+                useleitatt=args.useleitatt) as temp:
                             
             a = pymultinest.Analyzer(n_params=temp.ndims, outputfiles_basename=out_fmt.format(obj))
             values = a.get_equal_weighted_posterior()
@@ -861,15 +866,15 @@ for ind in range(nobj):
             mstarind = temp.sfh_npars+3
             sfr_samp = np.zeros(nsamp)
             rsamples = np.random.randint(values.shape[0], size=nsamp)
-            
+                            
             for ind,ii in enumerate(rsamples):
                 tsamp = values[ii,:-1]
+                mstars = temp._get_mstars(tsamp)
                 if sfh_type != 'custom':
-                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[mstarind]))
+                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[mstarind])/mstars)
                 else:
                    sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, temp.ndims)
-                   sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[5]))
-                
+                   sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[mstarind])/mstars)
                 
             medlsfr  = np.percentile(sfr_samp, 50)
             perclsfr = np.percentile(sfr_samp, [16,50,84])
@@ -1069,7 +1074,8 @@ for ind in range(nobj):
                 this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                 filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                 res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
-                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal) as temp:
+                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,\
+                useleitatt=args.useleitatt) as temp:
                             
             a = pymultinest.Analyzer(n_params=ndim, outputfiles_basename=out_fmt.format(obj))
             values = a.get_equal_weighted_posterior()
@@ -1132,11 +1138,12 @@ for ind in range(nobj):
             
             for ind,ii in enumerate(rsamples):
                 tsamp = values[ii,:-1]
+                mstars = temp._get_mstars(tsamp)
                 if sfh_type != 'custom':
-                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[5]))
+                   sfr_samp[ind] = np.log10(sfh.ssfr(tsamp[1], tsamp[0], temp.sfh_array, sfh_func, timeunit=temp.timeunit)*10**(tsamp[mstarind])/mstars)
                 else:
-                   sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, ndim)
-                   sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[5]))
+                   sfh_samp, age_samp = temp.reconstruct_sfh(tsamp, temp.ndims)
+                   sfr_samp[ind] = np.log10(sfh.ssfrfromfile(age_samp, sfh_samp, timeunit=temp.timeunit)*10**(tsamp[mstarind])/mstars)
                 
                 
             medlsfr  = np.percentile(sfr_samp, 50)

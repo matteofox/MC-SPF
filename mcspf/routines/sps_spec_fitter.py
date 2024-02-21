@@ -37,7 +37,8 @@ class sps_spec_fitter:
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
             fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None, \
             sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, sfhpar1range = None, sfhpar2range=None, sfhpar3range=None, \
-            emimodel='2018', emimetal=0.02, velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.,1.]):
+            emimodel='2018', emimetal=0.02, velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.,1.],\
+            useleitatt=False):
         
         """ Class for dealing with MultiNest fitting """
         
@@ -123,14 +124,17 @@ class sps_spec_fitter:
         if self.sfh_npars==1:
          self.mod_grid = np.zeros((self.par_len[0], self.n_wl), dtype=float)
          self.age_grid = np.zeros((self.par_len[0], 2),         dtype=float)
+         self.phy_grid = np.zeros((self.par_len[0], 2),         dtype=float) #extra parameters grid
          self.interp = _interp.interp
         elif self.sfh_npars==2:
          self.mod_grid = np.zeros((self.par_len[0], self.par_len[1], self.n_wl), dtype=float)
          self.age_grid = np.zeros((self.par_len[0], self.par_len[1], 2),         dtype=float)
+         self.phy_grid = np.zeros((self.par_len[0], self.par_len[1], 2),         dtype=float)
          self.interp = _interp.bi_interp
         elif self.sfh_npars==3:
          self.mod_grid = np.zeros((self.par_len[0], self.par_len[1], self.par_len[2], self.n_wl), dtype=float)
          self.age_grid = np.zeros((self.par_len[0], self.par_len[1], self.par_len[2], 2),         dtype=float)
+         self.phy_grid = np.zeros((self.par_len[0], self.par_len[1], 2),         dtype=float)
          self.interp = _interp.tri_interp
         else:
           print('ERROR: We cannot handle SFH grids with more than 3 dimensions. Abort')
@@ -165,6 +169,8 @@ class sps_spec_fitter:
             self.mod_grid[pos_tuple] = np.interp(self.wl, twl, mdata[:, 0]/mmass, left=0, right=0)
             self.fym_grid[pos_tuple] = np.interp(self.wl, twl, mdata[:, 1], left=0, right=0)
             self.age_grid[pos_tuple] = mage
+            self.phy_grid[pos_tuple] = mmass #TODO ALLOW FOR MULTIPLE PARS TO BE STORED
+
 
         mfile.close() 
         
@@ -204,6 +210,7 @@ class sps_spec_fitter:
         self.fym_grid[~np.isfinite(self.fym_grid)] = 0.
 
         #pre-compute attenuation curve for photometry
+        self.useleitatt = useleitatt
         self.k_cal = self._make_dusty(self.wl)
         
         #redshift the grid to be used in deriving predicted fluxes, also apply
@@ -719,6 +726,13 @@ class sps_spec_fitter:
         #Shorter than 6300
         k_cal[:div] = 2.659*(-2.156 + 1.509*(1e4/wl[:div]) - 0.198*(1e4/wl[:div])**2 + 0.011*(1e4/wl[:div])**3) + R
         
+        #IF REQUESTED Use leiterer 2002 formula below 1500A
+        if self.useleitatt:
+          div = wl.searchsorted(1500., side='left')
+          #Shorter than 1500
+          k_cal[:div] = (5.472 + 0.671e4 / wl[:div] - 9.218e5 / wl[:div] ** 2 + 2.620e9 / wl[:div] ** 3)
+  
+        
         #Fix negative values with zeros
         zero = bisect_left(-k_cal, 0.)
         k_cal[zero:] = 0.
@@ -879,8 +893,11 @@ class sps_spec_fitter:
         else:
          return -1e70  
         
+    def _get_mstars(self, p):
+    
+        isfh = tuple(p[:self.sfh_npars])
+        return self.interp(self.phy_grid, isfh, self.grid_arr)[0]
 
-        
     def _get_clyman(self, spec, fesc): #compute number of Lyman continuum photons
         #spectrum in erg/s/cm2/A so it returns the flux of ionizing photons not the rate
         lycont_spec = np.interp(self.lycont_wls, self.wl, spec) 
