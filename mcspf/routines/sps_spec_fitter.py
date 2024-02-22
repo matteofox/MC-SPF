@@ -135,7 +135,7 @@ class sps_spec_fitter:
         elif self.sfh_npars==3:
          self.mod_grid = np.zeros((self.par_len[0], self.par_len[1], self.par_len[2], self.n_wl), dtype=float)
          self.age_grid = np.zeros((self.par_len[0], self.par_len[1], self.par_len[2], 2),         dtype=float)
-         self.phy_grid = np.zeros((self.par_len[0], self.par_len[1], 2),         dtype=float)
+         self.phy_grid = np.zeros((self.par_len[0], self.par_len[1], self.par_len[2], 2),         dtype=float)
          self.interp = _interp.tri_interp
         else:
           print('ERROR: We cannot handle SFH grids with more than 3 dimensions. Abort')
