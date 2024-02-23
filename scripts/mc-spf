@@ -897,8 +897,8 @@ for ind in range(nobj):
             print('      RESULTS Reduced Phot Chi square: {0:7.3f}'.format(photo_chisq))
                         
             if args.overrideid:
-                fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{args.overrideid}} ~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
-                     .format(obj, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
+                fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{0}} ~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
+                     .format(args.overrideid, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
             else:
                fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
                      .format(obj, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
