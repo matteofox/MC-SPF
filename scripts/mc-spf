@@ -977,9 +977,11 @@ for ind in range(nobj):
                 stride = 1    
                             
             sfh_array = np.zeros((14000,args.nsampwrite))
-            age_array = np.zeros(args.nsampwrite, dtype=int)                            
+            age_array = np.zeros(args.nsampwrite, dtype=int)
+            longest_age = 0                            
             for ind,ii in enumerate(rsamples):
                 tsamp = values[ii,:-1]
+                mstars = temp._get_mstars(tsamp)
                 tflux, tphot = temp.reconstruct_phot(tsamp, temp.ndims)
                 
                 ax1.plot(temp.red_wl/1e4, tphot*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='firebrick', alpha=0.1, lw=0.6, rasterized=args.rasterize)
@@ -1002,12 +1004,16 @@ for ind in range(nobj):
                 else:
                    tmp_sfh, tmp_age = temp.reconstruct_sfh(tsamp, temp.ndims)
                    age_array[ind] = int(tmp_age)
-                   sfh_array[:len(tmp_sfh),ind] = tmp_sfh[:len(tmp_sfh)]*10**(tsamp[mstarind])
+                   sfh_array[:len(tmp_sfh),ind] = tmp_sfh[:len(tmp_sfh)]*10**(tsamp[mstarind])/mstars
                    try:
                      ax4.plot(np.arange(age_array[ind]), sfh_array[:len(tmp_sfh),ind],color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
                    except:
                      ax4.plot(np.arange(len(tmp_sfh)), sfh_array[:len(tmp_sfh),ind],color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
-
+                
+                longest_age = np.max([longest_age, age_array[ind]])
+                
+            ax4.plot(np.arange(longest_age), np.mean(sfh_array, axis=1)[:longest_age],color='red', alpha=1, lw=1.2, rasterized=args.rasterize)
+            
             if args.writesfh:
                fwritesfh(sfh_array, age_array, obj, args.nsampwrite)
                                                                    
