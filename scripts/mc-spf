@@ -897,7 +897,7 @@ for ind in range(nobj):
             print('      RESULTS Reduced Phot Chi square: {0:7.3f}'.format(photo_chisq))
                         
             if args.overrideid:
-                fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{0}} ~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
+                fig.text(0.08, 0.94-0.005*temp.n_spec, r'${0} ~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
                      .format(args.overrideid, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
             else:
                fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
@@ -926,7 +926,7 @@ for ind in range(nobj):
                    zoom = 1.5
                    
                    pltsp.plotspec(10**temp.log_wl[spid], temp.log_obj[spid]*temp.spec_norm[spid]*spfscale, color='black',       mask= temp.goodpix_spec[spid], zorder=1.05)                
-                   pltsp.plotspec(10**temp.log_wl[spid], temp.log_obj[spid]*temp.spec_norm[spid]*spfscale, color='darkgrey',    mask=~temp.goodpix_spec[spid], zorder=1.05)
+                   #pltsp.plotspec(10**temp.log_wl[spid], temp.log_obj[spid]*temp.spec_norm[spid]*spfscale, color='darkgrey',    mask=~temp.goodpix_spec[spid], zorder=1.05)
                    clean_spec = contspec*temp.spec_norm[spid]*spfscale 
                    
                    axsp[spid].plot(10**temp.log_wl[spid], totspec*temp.spec_norm[spid]*spfscale, '-', alpha=1.0, color='firebrick', lw=1.0, zorder=1.1)
@@ -1036,7 +1036,7 @@ for ind in range(nobj):
             ax1.set_xlabel(r'$\mathrm{Observed~Wavelength}~[\mu \mathrm{m}]$')
             ax1.set_ylabel(r'$\lambda~L_\lambda [L_\odot]$')
             
-            ax4.set_xlabel(r'$\mathrm{{Time~[{}]}}$'.format(temp.timeunit))
+            ax4.set_xlabel(r'$\mathrm{{Age~[{}]}}$'.format(temp.timeunit))
             ax4.set_ylabel(r'$SFR~\mathrm{[M_\odot~yr^{-1}]}$')
                     
             #Plot Tquench Tauquench covariance plot
