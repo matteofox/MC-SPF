@@ -1068,7 +1068,7 @@ for ind in range(nobj):
                pary_unit = ''
             elif 'outer' in (args.overrideid).lower():  
                print('OUTER')
-               values[:,0] = 1-values{:,0]
+               values[:,0] = 1-values[:,0]
                indx = 0
                indy = 1
                pary_str = 'Frac.~Young'
