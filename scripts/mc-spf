@@ -1046,10 +1046,10 @@ for ind in range(nobj):
                print('NUCLEUS')
                indx = 0
                indy = 2
-               parx_str = 'Frac.~Old'
-               parx_unit = ''
-               pary_str = 'JumpAge.~Old'
-               pary_unit = '[Myr]'
+               pary_str = 'Frac.~Old'
+               pary_unit = ''
+               parx_str = 'JumpAge.~Old'
+               parx_unit = '[Myr]'
             elif 'inner' in (args.overrideid).lower():  
                print('INNER')
                indx = 0
@@ -1068,12 +1068,13 @@ for ind in range(nobj):
                pary_unit = ''
             elif 'outer' in (args.overrideid).lower():  
                print('OUTER')
+               values[:,0] = 1-values{:,0]
                indx = 0
                indy = 1
-               parx_str = 'Frac.~Young'
-               parx_unit = ''
-               pary_str = 'JumpAge.~Young'
-               pary_unit = '[Myr]'
+               pary_str = 'Frac.~Young'
+               pary_unit = ''
+               parx_str = 'JumpAge.~Young'
+               parx_unit = '[Myr]'
          
             #Plot Tquench Tauquench covariance plot
             triangle.hist2d(values[:,indy], values[:,indx], ax=ax5)
