@@ -1006,13 +1006,13 @@ for ind in range(nobj):
                    age_array[ind] = int(tmp_age)
                    sfh_array[:len(tmp_sfh),ind] = tmp_sfh[:len(tmp_sfh)]*10**(tsamp[mstarind])/mstars
                    try:
-                     ax4.plot(np.arange(age_array[ind]), sfh_array[:len(tmp_sfh),ind],color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
+                     ax4.plot(np.arange(age_array[ind])[::-1], sfh_array[:len(tmp_sfh),ind],color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
                    except:
-                     ax4.plot(np.arange(len(tmp_sfh)), sfh_array[:len(tmp_sfh),ind],color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
+                     ax4.plot(np.arange(len(tmp_sfh))[::-1], sfh_array[:len(tmp_sfh),ind],color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
                 
                 longest_age = np.max([longest_age, age_array[ind]])
                 
-            ax4.plot(np.arange(longest_age), np.mean(sfh_array, axis=1)[:longest_age],color='red', alpha=1, lw=1.2, rasterized=args.rasterize)
+            ax4.plot(np.arange(longest_age)[::-1], np.mean(sfh_array, axis=1)[:longest_age],color='red', alpha=1, lw=1.2, rasterized=args.rasterize)
             
             if args.writesfh:
                fwritesfh(sfh_array, age_array, obj, args.nsampwrite)
@@ -1029,41 +1029,57 @@ for ind in range(nobj):
                phyrange = np.array([1e6,2e11])
 
             if args.timerange != None:
-               timerange = np.array((args.timerange).split(','), dtype=float)
+               timerange = np.array((args.timerange).split(','), dtype=float)[::-1]
                ax4.set_xlim(timerange)
-
+            
+            ax4.invert_xaxis()
+            
+            
             ax1.axis([phxmin, phxmax, phyrange[0],phyrange[1]])
             ax1.set_xlabel(r'$\mathrm{Observed~Wavelength}~[\mu \mathrm{m}]$')
             ax1.set_ylabel(r'$\lambda~L_\lambda [L_\odot]$')
             
-            ax4.set_xlabel(r'$\mathrm{{Age~[{}]}}$'.format(temp.timeunit))
+            ax4.set_xlabel(r'$\mathrm{{Lookback~Time~[{}]}}$'.format(temp.timeunit))
             ax4.set_ylabel(r'$SFR~\mathrm{[M_\odot~yr^{-1}]}$')
-                    
+                               
+            if 'nucleus' in (args.overrideid).lower():
+               print('NUCLEUS')
+               indx = 0
+               indy = 2
+               parx_str = 'Frac.~Old'
+               parx_unit = ''
+               pary_str = 'JumpAge.~Old'
+               pary_unit = '[Myr]'
+            elif 'inner' in (args.overrideid).lower():  
+               print('INNER')
+               indx = 0
+               indy = 1
+               parx_str = 'Frac.~Old'
+               parx_unit = ''
+               pary_str = 'Frac.~Young'
+               pary_unit = ''
+            elif 'between' in (args.overrideid).lower():  
+               print('BETWEEN')
+               indx=0
+               indy=1
+               parx_str = 'Frac.~Old'
+               parx_unit = ''
+               pary_str = 'Frac.~Young'
+               pary_unit = ''
+            elif 'outer' in (args.overrideid).lower():  
+               print('OUTER')
+               indx = 0
+               indy = 1
+               parx_str = 'Frac.~Young'
+               parx_unit = ''
+               pary_str = 'JumpAge.~Young'
+               pary_unit = '[Myr]'
+         
             #Plot Tquench Tauquench covariance plot
-            triangle.hist2d(values[:,1], values[:,0], ax=ax5)
-            ax5.axvline(meds[1], color='firebrick', lw=1)
-            ax5.axhline(meds[0], color='firebrick', lw=1)
-            
-            parx_str = sfh_pars[1].capitalize()
-            pary_str = sfh_pars[0].capitalize()
-            
-            if 'Age' in parx_str or 'Tau' in parx_str:
-               parx_unit = '['+temp.timeunit+']'
-            else:
-               parx_unit = ''   
-            
-            if 'Age' in pary_str or 'Tau' in pary_str:
-               pary_unit = '['+temp.timeunit+']'
-            else:
-               pary_unit = ''   
-            
-            if parx_str == 'Frac3':
-               parx_str == 'Frac.~Old'
-               pary_str == 'Frac.~Young'
-            elif parx_str == 'Jumpage':
-               parx_str == 'Jump~Age'
-               pary_str == 'Frac.~Old'
-            
+            triangle.hist2d(values[:,indy], values[:,indx], ax=ax5)
+            ax5.axvline(meds[indy], color='firebrick', lw=1)
+            ax5.axhline(meds[indx], color='firebrick', lw=1)
+ 
             ax5.set_xlabel(r'$\mathrm{{{}~{}}}$'.format(parx_str,parx_unit))
             ax5.set_ylabel(r'$\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
             
