@@ -722,7 +722,7 @@ for ind in range(nobj):
                 
                 if sfh_func != 'none':
                    tmp_sfh = sfh_func(temp.sfh_array, tsamp[1],tsamp[0])*10**(tsamp[mstarind])
-                   age_array[ind] = len(sfh_samp)
+                   age_array[ind] = len(tmp_sfh)
                    sfh_array[:age_array[ind],ind] = tmp_sfh
                    ax4.plot(np.arange(age_array[ind]), tmp_sfh,color='black', alpha=0.1, lw=0.6, rasterized=args.rasterize)
                 else:
