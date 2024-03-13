@@ -36,19 +36,18 @@ def fwritesed(temp, obj, mphot, this_obj_z, funit, plotdir, nsamp, nsampwrite):
             
              hdu = fits.BinTableHDU.from_columns([col1, col2, col3, col4, col5])
              hdu.writeto(plotdir+'id{0}_best_sed.fits'.format(obj), overwrite=True)
-              
              
              if nsampwrite>0:
-               hdu = fits.BinTableHDU.from_columns([col1])
                nsamples = np.min((nsamp, nsampwrite))
                colarray=[col1]
               
                for ind, ii in enumerate(rsamples[:nsamples]):
                    tsamp = values[ii,:-1]
                    tflux, tphot = temp.reconstruct_phot(tsamp, temp.ndims)
-                   colarray.append(fits.Column(name='f_nu_obs_{}'.format(ind),  format='E', unit=args.funit,  array=tphot*temp.fscale*temp.red_wl**2/temp.clight*1E26))
+                   colarray.append(fits.Column(name='f_nu_obs_{}'.format(ind),  format='E', unit=funit,  array=tphot*temp.fscale*temp.red_wl**2/temp.clight*1E26))
               
                hdu = fits.BinTableHDU.from_columns(colarray)
+               hdu.header['REDSHIFT'] = this_obj_z
                hdu.writeto(plotdir+'id{0}_samp_sed.fits'.format(obj), overwrite=True)
 
 def fwritesfh(sfh_array, age_array, obj, nsampwrite):
@@ -781,6 +780,7 @@ for ind in range(nobj):
             ax5.set_ylabel(r'$\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
             
             pl.savefig(plotdir+'id{0}_summary.pdf'.format(obj), bbox_inches='tight')
+            pl.close()
             
             fwriteresults(plotdir, fit_file, temp, parameters, percs, perclsfr, Ndet, Nbands, lnz, photo_chisq, spec_chisq)
 
@@ -1088,6 +1088,7 @@ for ind in range(nobj):
             ax5.set_ylabel(r'$\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
             
             pl.savefig(plotdir+'id{0}_summary.pdf'.format(obj), bbox_inches='tight')
+            pl.close()
             
             fwriteresults(plotdir, fit_file, temp, parameters, percs, perclsfr, Ndet, Nbands, lnz, photo_chisq, spec_chisq)
  
