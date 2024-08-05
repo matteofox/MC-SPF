@@ -133,6 +133,8 @@ grpinp.add_argument('--funit',     default= 'mJy', help='The flux unit of the in
 grpinp.add_argument('--emimetal',  default= 0.02,  type=float, help='Emission line metallicity Default = 0.02 (Solar value)')
 grpinp.add_argument('--emimodel',  default= '2017',  help="Emission line CLOUDY table (can only be '2017' or '2018') ")
 grpinp.add_argument('--useleitatt',dest='useleitatt',  action = 'store_true', help='If set, use the Leitherer et al. (2002) attenuation curve below 1500A.')
+grpinp.add_argument('--debug',     dest='debug',  action = 'store_true', help='Verbose mode for debugging.')
+
 
 grpfit = parser.add_argument_group('Fit related arguments')
 
@@ -153,6 +155,7 @@ grpplt = parser.add_argument_group('Plot related arguments')
 
 grpplt.add_argument('--spxrange',   default= None,    help='X-axis (Wave) range for spectra plots')
 grpplt.add_argument('--spyrange',   default= None,    help='Y-axis (Flux) range for spectra plots')
+grpplt.add_argument('--phxrange',   default= None,    help='X-axis (Wave) range for photometry plot')
 grpplt.add_argument('--phyrange',   default= None,    help='Y-axis (Luminosity) range for photometry plot')
 grpplt.add_argument('--timerange',  default= None,    help='X-axis (Time) range for SFH plot')
 grpplt.add_argument('--rasterize', dest='rasterize', action='store_true', help='If set, will make smaller summary plots by rasterizing some lines.')
@@ -392,6 +395,16 @@ for ind in range(nobj):
     this_obj_islim = np.asarray(this_obj_islim)
     this_obj_bands = np.asarray(this_obj_bands)  
     
+    if args.debug:
+       print('Flux array:')
+       print(this_obj_flux)
+       print('Error array:')
+       print(this_obj_err)
+       print('UL array:')
+       print(this_obj_islim)
+       print('Filters identified:')
+       print(this_obj_bands)
+      
     Nbands = len(this_obj_flux)
     Ndet   = Nbands - np.sum(this_obj_islim)
     print("      INFO: Object detected in {} out of {} bands".format(Ndet, Nbands))
@@ -594,7 +607,7 @@ for ind in range(nobj):
             perclsfr = np.percentile(sfr_samp, [16,50,84])
             print('      RESULTS Best fit for parameter {0}: {1:8.3f} + {2:7.3f} - {3:7.3f} (DERIVED)'.format('lSFR'.ljust(10), medlsfr, abs(perclsfr[2]-medlsfr), abs(perclsfr[0]-medlsfr)))
 
-            zupd = (1.+this_obj_z)*(1.+meds[4]*1e13/temp.clight)-1
+            zupd = (1.+this_obj_z)*(1.+meds[temp.sfh_npars+5]*1e13/temp.clight)-1
 
             mflux, mphot = temp.reconstruct_phot(meds, temp.ndims)
             
@@ -611,11 +624,11 @@ for ind in range(nobj):
             print('      RESULTS Reduced Phot Chi square: {0:7.3f}'.format(photo_chisq))
                         
             if np.isfinite(lnz) and np.isfinite(dlnz):
-              fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} ~~~~~ \ln Z = {4:.2f}\pm{5:.2f}$'\
-                     .format(obj, this_obj_z, meds[mstarind], medlsfr, lnz, dlnz), transform=fig.transFigure)
+              fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f} ~~~~~ \ln Z = {5:.2f}\pm{6:.2f}$'\
+                     .format(obj, this_obj_z, meds[mstarind], medlsfr, meds[temp.sfh_npars+0], lnz, dlnz), transform=fig.transFigure)
             else:
-              fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
-                     .format(obj, this_obj_z, meds[mstarind], medlsfr), transform=fig.transFigure)
+              fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f}$'\
+                     .format(obj, this_obj_z, meds[mstarind], medlsfr, meds[temp.sfh_npars+0]), transform=fig.transFigure)
             
             
             spfscale = 1E18 #go from 1e-20 to 1e-18
@@ -691,7 +704,8 @@ for ind in range(nobj):
             
             #Set number and index of random samples
             rsamples = np.random.randint(values.shape[0], size=args.nsampwrite)
-            phxmin = 0.8*np.min(temp.pivot_wl/1e4)
+            print(temp.pivot_wl)
+            phxmin = 0.8*np.nanmin(temp.pivot_wl/1e4)
             phxmax = 1.2*np.nanmax(temp.pivot_wl/1e4)
 
             npoints = len(temp.dusty_phot_young[(temp.red_wl/1e4 > phxmin) & (temp.red_wl/1e4 < phxmax)])
@@ -746,12 +760,22 @@ for ind in range(nobj):
                phyrange = np.array((args.phyrange).split(','), dtype=float)
             else:
                phyrange = np.array([1e6,2e11])
+            
+            if args.phxrange != None:
+               phxrange = np.array((args.phxrange).split(','), dtype=float)/1e4
+            else:
+               phxrange = np.array([phxmin,phxmax])
 
             if args.timerange != None:
                timerange = np.array((args.timerange).split(','), dtype=float)
                ax4.set_xlim(timerange)
-
-            ax1.axis([phxmin, phxmax, phyrange[0],phyrange[1]])
+            
+            if args.debug:
+               print('Photometric plot, x-axis limits {} {}'.format(phxmin, phxmax))
+               print('Photometric plot, y-axis limits {} {}'.format(phyrange[0], phyrange[1]))
+               
+            
+            ax1.axis([phxrange[0], phxrange[1], phyrange[0],phyrange[1]])
             ax1.set_xlabel(r'$\mathrm{Observed~Wavelength}~[\mu \mathrm{m}]$')
             ax1.set_ylabel(r'$\lambda~L_\lambda [L_\odot]$')
             

@@ -396,7 +396,7 @@ class sps_spec_fitter:
     def sanitize_sfhpar_lims(self, sfhparrange, ind):
     
         if sfhparrange is None:
-            if self.sfh_pars[0].upper() =='AGE':
+            if self.sfh_pars[ind].upper() =='AGE':
               maxval_valid = np.min((self.grid_arr[ind].max(), self.gal_age))
             else:
               maxval_valid = self.grid_arr[ind].max()
@@ -404,7 +404,7 @@ class sps_spec_fitter:
         else:
             #Verify validity of user requested values
             minval_valid = np.max((self.grid_arr[ind].min(), sfhparrange[0]))
-            if self.sfh_pars[0].upper() =='AGE':
+            if self.sfh_pars[ind].upper() =='AGE':
               maxval_valid = np.min((self.grid_arr[ind].max(), sfhparrange[1], self.gal_age))
             else:
               maxval_valid = np.min((self.grid_arr[ind].max(), sfhparrange[1]))
@@ -761,7 +761,7 @@ class sps_spec_fitter:
         
         for ii, filt in enumerate(self.filters):
             
-            if 'line' in filt:
+            if 'line' in filt: #not sure what this is for
              return 0,0
            
             fobj = get_filter(filters_db, filt)
