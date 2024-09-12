@@ -38,7 +38,7 @@ class sps_spec_fitter:
             fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None, \
             sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, sfhpar1range = None, sfhpar2range=None, sfhpar3range=None, \
             emimodel='2018', emimetal=0.02, velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.,1.],\
-            useleitatt=False):
+            useleitatt=False, spfunit = 1E-20):
         
         """ Class for dealing with MultiNest fitting """
         
@@ -65,6 +65,7 @@ class sps_spec_fitter:
         self.cropspec = cropspec
         self.polymax = polymax
         self.emimetal = emimetal
+        self.spfunit = spfunit
         
         #constants
         self.small_num = 1e-70
@@ -505,8 +506,8 @@ class sps_spec_fitter:
         range_crop = (wl_obj > cropspec[0]) & (wl_obj < cropspec[1])
         
         wl_obj = wl_obj[range_crop]
-        obj = obj[range_crop] * 1E-20
-        obj_noise = obj_noise[range_crop] * 1E-20
+        obj = obj[range_crop] * self.spfunit
+        obj_noise = obj_noise[range_crop] * self.spfunit
         npix_obj = len(wl_obj)
         
         goodpix_lin =  np.isfinite(obj) & np.isfinite(obj_noise)
