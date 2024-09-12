@@ -37,7 +37,7 @@ class sps_spec_fitter:
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
             fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None, \
             sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, sfhpar1range = None, sfhpar2range=None, sfhpar3range=None, \
-            emimodel='2018', emimetal=0.02, velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.,1.],\
+            emimodel='2018', emimetal=0.02, dustemimodel='DH02', velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.,1.],\
             useleitatt=False, spfunit = 1E-20):
         
         """ Class for dealing with MultiNest fitting """
@@ -106,7 +106,7 @@ class sps_spec_fitter:
         twl = self.airtovac(wdata)
         
         #get the wavelength information for the DH02 templates to stitch the two together
-        dh_wl = np.loadtxt(modeldir+'spectra_DH02.dat', usecols=(0,))*1e4
+        dh_wl = np.loadtxt(modeldir+'spectra_{}.dat'.format(dustemimodel), usecols=(0,))*1e4
         dh_nwl = len(dh_wl)
 
         #expand wavelength grid to include range covered by DH templates
@@ -296,12 +296,12 @@ class sps_spec_fitter:
                 
         #### LOAD DUST EMISSION TABLES ####
         #first fetch alpha values
-        self.dh_alpha = np.loadtxt(modeldir+'alpha_DH02.dat', usecols=(0,))
+        self.dh_alpha = np.loadtxt(modeldir+'alpha_{}.dat'.format(dustemimodel), usecols=(0,))
         self.dh_nalpha = len(self.dh_alpha)
 
         self.dh_dustemm = np.zeros((self.dh_nalpha, self.n_wl), dtype=float)
         for ii in range(self.dh_nalpha):
-            tdust = 10**np.loadtxt(modeldir+'spectra_DH02.dat', usecols=(ii+1,))
+            tdust = 10**np.loadtxt(modeldir+'spectra_{}.dat'.format(dustemimodel), usecols=(ii+1,))
             self.dh_dustemm[ii,:] = np.interp(self.wl, dh_wl, tdust)/self.wl
 
         #normalize to Lbol = 1

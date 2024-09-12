@@ -135,6 +135,7 @@ grpinp.add_argument('--spfunit',   default= 1E-20, help='The flux unit of the in
 grpinp.add_argument('--emimetal',  default= 0.02,  type=float, help='Emission line metallicity Default = 0.02 (Solar value)')
 grpinp.add_argument('--emimodel',  default= '2017',  help="Emission line CLOUDY table (can only be '2017' or '2018') ")
 grpinp.add_argument('--useleitatt',dest='useleitatt',  action = 'store_true', help='If set, use the Leitherer et al. (2002) attenuation curve below 1500A.')
+grpinp.add_argument('--dustemimodel',default= 'dh02',  help="Dust Emission model to be used (can only be 'DH02' or 'DL14')")
 grpinp.add_argument('--debug',     dest='debug',  action = 'store_true', help='Verbose mode for debugging.')
 
 
@@ -485,7 +486,7 @@ for ind in range(nobj):
                polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
                sfh_age_par = sfh_age_par, dl=dl, sfhpar1range=sfhpar1range, \
                sfhpar2range=sfhpar2range,sfhpar3range=sfhpar3range,fescrange=fescrange,sigrange=sigrange,\
-               velrange=velrange,emimetal=args.emimetal,emimodel=args.emimodel,\
+               velrange=velrange,emimetal=args.emimetal,emimodel=args.emimodel,dustemimodel=args.dustemimodel,\
                useleitatt=args.useleitatt, spfunit=spfunit) as temp:
     
           
@@ -523,7 +524,7 @@ for ind in range(nobj):
                 this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                 filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                 res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
-                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel,\
+                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel,dustemimodel=args.dustemimodel,\
                 useleitatt=args.useleitatt, spfunit=spfunit) as temp:
                             
             a = pymultinest.Analyzer(n_params=temp.ndims, outputfiles_basename=out_fmt.format(obj))
@@ -1018,7 +1019,7 @@ for ind in range(nobj):
                 this_obj_bands, this_obj_islim, spec_in=spec_file, cropspec=cropspec, \
                 filtdir=modeldir+'Filters/', modeldir=modeldir+'Dust_Emi_models/', \
                 res_in=res_file, polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
-                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel,\
+                sfh_age_par=sfh_age_par, dl=dl, emimetal=args.emimetal,emimodel=args.emimodel,dustemimodel=args.dustemimodel,\
                 useleitatt=args.useleitatt, spfunit=spfunit) as temp:
                             
             a = pymultinest.Analyzer(n_params=temp.ndims, outputfiles_basename=out_fmt.format(obj))
