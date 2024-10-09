@@ -294,7 +294,7 @@ class sps_spec_fitter:
                     np.diff(0.5*(1.+erf((self.wl_edges[None,:]-self.emm_wls[:,None])/\
                     np.sqrt(2.*self.res_lines**2)[:,None])), axis=1)/np.diff(self.wl_edges), axis=0)
                 
-        #### LOAD DUST EMISSION TABLES ####
+        #### START LOAD DUST EMISSION TABLES ####
         #first fetch alpha values
         self.dh_alpha = np.loadtxt(modeldir+'alpha_{}.dat'.format(dustemimodel), usecols=(0,))
         self.dh_nalpha = len(self.dh_alpha)
@@ -302,13 +302,15 @@ class sps_spec_fitter:
         self.dh_dustemm = np.zeros((self.dh_nalpha, self.n_wl), dtype=float)
         for ii in range(self.dh_nalpha):
             tdust = 10**np.loadtxt(modeldir+'spectra_{}.dat'.format(dustemimodel), usecols=(ii+1,))
+            #tdust[dh_wl<5e4] = 0.
+            #Interpolate the models in nu*fnu to the final wave grid, then divide by wave to get flambda
             self.dh_dustemm[ii,:] = np.interp(self.wl, dh_wl, tdust)/self.wl
 
         #normalize to Lbol = 1
         norm = np.trapz(self.dh_dustemm, self.wl)
         self.dh_dustemm /= norm[:,None]
         
-        #### LOAD DUST EMISSION TABLES ####        
+        #### END LOAD DUST EMISSION TABLES ####        
                 
         self.filters = filter_list #should already correspond to FSPS names
         self.n_bands = len(self.filters)
@@ -1043,12 +1045,12 @@ class sps_spec_fitter:
         
         #### THERMAL DUST EMISSION ####
         lbol_init = np.trapz(temp_young+temp_old+emm_young+emm_old, self.wl)
-        lbol_att = np.trapz(self.dusty_phot, self.wl)
+        lbol_att  = np.trapz(self.dusty_phot, self.wl)
 
         dust_emm = (lbol_init - lbol_att)
         tdust_phot = _interp.interp(self.dh_dustemm, (ialpha,), (self.dh_alpha,))
 
-        #remove stellar component
+        #remove stellar component which is included in dale models
         mask_pixels = (self.wl >= 2.5e4) & (self.wl <= 3e4)
         scale = np.sum(spec_model[mask_pixels]*tdust_phot[mask_pixels]) / np.sum(spec_model[mask_pixels]*spec_model[mask_pixels])
         
