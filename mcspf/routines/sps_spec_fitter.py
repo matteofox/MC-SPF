@@ -674,7 +674,7 @@ class sps_spec_fitter:
     #This should be used with MultiNest 
     def _scale_cube_mn(self, cube, ndims, nparams):
         for ii in range(ndims):
-            cube[ii] = cube[ii]*self.bounds[ii].ptp() + np.min(self.bounds[ii])
+            cube[ii] = cube[ii]*np.ptp(self.bounds[ii]) + np.min(self.bounds[ii])
 
         return
     

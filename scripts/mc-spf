@@ -1077,6 +1077,9 @@ for ind in range(nobj):
             hdu_list[0].header['NEXT'] = cnt
             hdu_list[0].data = temp.wl_obj
             hdu_list.writeto(args.outdir+'Models_N4330_region{}.fits'.format(obj), overwrite=True)
+            
+    else:
+         print('User command: {} not understood.'.format(args.mode))        
 '''
             
     elif args.mode == 'PLOTCART':
