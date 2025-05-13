@@ -774,10 +774,15 @@ for ind in range(nobj):
             if args.timerange != None:
                timerange = np.array((args.timerange).split(','), dtype=float)
                ax4.set_xlim(timerange)
+               
+               if args.debug:
+                  print('SFH plot, x-axis limits {} {}'.format(timerange[0], timerange[1]))
+
             
             if args.debug:
                print('Photometric plot, x-axis limits {} {}'.format(phxmin, phxmax))
                print('Photometric plot, y-axis limits {} {}'.format(phyrange[0], phyrange[1]))
+               
                
             
             ax1.axis([phxrange[0], phxrange[1], phyrange[0],phyrange[1]])
