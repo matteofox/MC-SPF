@@ -196,12 +196,14 @@
 196     MUSE RED   (tophat)
 197     MUSE NIR   (tophat)
 198     MUSE WHITE AOE (from muse manual)
-199	UVIT FUV F154W (UVIT FUV Filter, in-orbit calib. July 2017 (A. Subramaniam))
-200	HAWKI H
-201	HAWKI CH4
-202	HAWKI Ks (from eso website)
-203	JWST MIRI F770W
-204	JWST MIRI F1000W
-205     JWST MIRI F1280W
-206	JWST MIRI F1800W
-207	ALMA Band6 1p2mm
+199	UVIT FUV F154W (UVIT FUV BaF2 Filter, from Tandon et al. 2020, downloaded from SVO)
+200	UVIT NUV N245M (UVIT NUV B13 filter,  from Tandon et al. 2020, downloaded from SVO)
+201	UVIT NUV N263M (UVIT NUV B4 filter,   from Tandon et al. 2020, downloaded from SVO)
+202	HAWKI H
+203	HAWKI CH4
+204	HAWKI Ks (from eso website)
+205     JWST MIRI F770W
+206	JWST MIRI F1000W
+207	JWST MIRI F1280W
+208	JWST MIRI F1800W
+209	ALMA Band6 1p2mm
