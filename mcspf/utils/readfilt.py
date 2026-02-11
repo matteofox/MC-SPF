@@ -13,7 +13,8 @@ __all__ = ["init_filters", "find_filter", "get_filter", "list_filters"]
 
 import os
 import numpy as np
-from pkg_resources import resource_stream, resource_exists
+
+
 
 
 # Cache for $SPS_HOME/data/filter_lambda_eff.dat parsed by numpy

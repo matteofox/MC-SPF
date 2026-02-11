@@ -193,6 +193,9 @@ if args.solver == 'ultranest':
   import ultranest            
 elif args.solver =='multinest':
   import pymultinest
+elif args.solver =='dynesty':
+  import dynesty
+  import dynesty.utils as dyfunc  
 else:
   print("ERROR: Solver not understood or not implemented. Aborting...")
   exit()
@@ -492,15 +495,33 @@ for ind in range(nobj):
     
           
           if args.solver == 'ultranest':
+            
             solver = ultranest.integrator.ReactiveNestedSampler(parameters, temp.lnlhood_un, transform=temp._scale_cube_un, vectorized=False)# \
                     # log_dir=os.path.dirname(out_fmt.format(obj)))
             solver.run(min_num_live_points=args.nlive,dlogz=0.5)
 
           elif args.solver =='multinest':
+            
             pymultinest.run(temp.lnlhood_mn, temp._scale_cube_mn, temp.ndims, sampling_efficiency=args.sampeff, resume=False, \
                     outputfiles_basename=out_fmt.format(obj), verbose=True, multimodal=False, \
                     importance_nested_sampling=False, n_live_points=args.nlive, n_iter_before_update=500, \
                     evidence_tolerance=0.5)
+
+          elif args.solver =='dynesty':
+
+            out_fmt = configpars['chaindir']+'/'+configpars['chainfmt'].format(comp, configpars['nfill'])
+            
+            dsampler = dynesty.DynamicNestedSampler(temp.lnlhood_dy, temp._scale_cube_pc, temp.ndim, bound='none', method='unif')
+            dsampler.run_nested()
+            dresults = dsampler.results
+            
+            samples = dresults.samples  # samples
+            weights = np.exp(dresults.logwt - dresults.logz[-1])  # normalized weights
+
+            # Resample weighted samples.
+            samples_equal = dyfunc.resample_equal(samples, weights)
+            np.savetxt(out_fmt+'equal_weights.txt', samples_equal)          
+
           
           if not args.fullout:
              try:
@@ -632,10 +653,10 @@ for ind in range(nobj):
             #print(((oflux_lam-mflux)/oflux_err_lam)**2)
                         
             if np.isfinite(lnz) and np.isfinite(dlnz):
-              fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f} ~~~~~ \ln Z = {5:.2f}\pm{6:.2f}$'\
+              fig.text(0.08, 0.94-0.005*temp.n_spec, '$\\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \\log(M_*) = {2:.2f} ~~~~~ \\log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f} ~~~~~ \\ln Z = {5:.2f}\\pm{6:.2f}$' \
                      .format(obj, this_obj_z, meds[mstarind], medlsfr, meds[temp.sfh_npars+0], lnz, dlnz), transform=fig.transFigure)
             else:
-              fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f}$'\
+              fig.text(0.08, 0.94-0.005*temp.n_spec, '$\\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \\log(M_*) = {2:.2f} ~~~~~ \\log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f}$' \
                      .format(obj, this_obj_z, meds[mstarind], medlsfr, meds[temp.sfh_npars+0]), transform=fig.transFigure)
             
             
@@ -687,10 +708,13 @@ for ind in range(nobj):
                    axsp[spid].xaxis.set_major_locator(MultipleLocator(500))
                    axsp[spid].xaxis.set_minor_locator(MultipleLocator(100))
                    
-                   axsp[spid].set_ylabel(r'$f_\lambda [10^{{-{0:2.0f}}}~\mathrm{{erg~s^{{-1}}~cm^{{-2}}~\AA^{{-1}}}}]$'.format(np.log10(spfscale)))
-                   axsr[spid].set_ylabel(r'$f_\lambda-f_\mathrm{model}$')
+                   axsp[spid].set_ylabel('$f_\\lambda [10^{{-{0:2.0f}}}~\\mathrm{{erg~s^{{-1}}~cm^{{-2}}~\\AA^{{-1}}}}]$'.format(np.log10(spfscale)))
+
+                   axsr[spid].set_ylabel('$f_\\lambda-f_\\mathrm{model}$')
+
                    if spid == temp.n_spec -1:
-                      axsr[spid].set_xlabel(r'$\mathrm{Observed~Wavelength}~[\mathrm{\AA}]$')
+                      axsr[spid].set_xlabel('$\\mathrm{Observed~Wavelength}~[\\mathrm{\\AA}]$')
+
                    
                    for tick in axsp[spid].xaxis.get_major_ticks():
                        tick.label1On=False
@@ -791,11 +815,15 @@ for ind in range(nobj):
                
             
             ax1.axis([phxrange[0], phxrange[1], phyrange[0],phyrange[1]])
-            ax1.set_xlabel(r'$\mathrm{Observed~Wavelength}~[\mu \mathrm{m}]$')
-            ax1.set_ylabel(r'$\lambda~L_\lambda [L_\odot]$')
+            ax1.set_xlabel('$\\mathrm{Observed~Wavelength}~[\\mu \\mathrm{m}]$')
+
+            ax1.set_ylabel('$\\lambda~L_\\lambda [L_\\odot]$')
+
             
-            ax4.set_xlabel(r'$\mathrm{{Time~[{}]}}$'.format(temp.timeunit))
-            ax4.set_ylabel(r'$SFR~\mathrm{[M_\odot~yr^{-1}]}$')
+            ax4.set_xlabel('$\\mathrm{{Time~[{}]}}$'.format(temp.timeunit))
+
+            ax4.set_ylabel('$SFR~\\mathrm{[M_\\odot~yr^{-1}]}$')
+
                     
             #Plot Tquench Tauquench covariance plot
             triangle.hist2d(values[:,1], values[:,0], ax=ax5)
@@ -815,8 +843,10 @@ for ind in range(nobj):
             else:
                pary_unit = ''   
             
-            ax5.set_xlabel(r'$\mathrm{{{}~{}}}$'.format(parx_str,parx_unit))
-            ax5.set_ylabel(r'$\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
+            ax5.set_xlabel('$\\mathrm{{{}~{}}}$'.format(parx_str,parx_unit))
+
+            ax5.set_ylabel('$\\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
+
             
             pl.savefig(plotdir+'id{0}_summary.pdf'.format(obj), bbox_inches='tight')
             pl.close()
@@ -921,7 +951,7 @@ for ind in range(nobj):
             
             print('      RESULTS Reduced Phot Chi square: {0:7.3f}'.format(photo_chisq))
                         
-            fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
+            fig.text(0.08, 0.94-0.005*temp.n_spec, '$\\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \\log(M_*) = {2:.2f} ~~~~~ \\log(SFR) = {3:.3f} $' \
                      .format(obj, this_obj_z, meds[5], medlsfr), transform=fig.transFigure)
             
             
@@ -959,10 +989,13 @@ for ind in range(nobj):
                    axsp[spid].xaxis.set_major_locator(MultipleLocator(500))
                    axsp[spid].xaxis.set_minor_locator(MultipleLocator(100))
                    
-                   axsp[spid].set_ylabel(r'$f_\lambda [10^{{-{0:2.0f}}}~\mathrm{{erg~s^{{-1}}~cm^{{-2}}~\AA^{{-1}}}}]$'.format(np.log10(spfscale)))
-                   axsr[spid].set_ylabel(r'$f_\lambda-f_\mathrm{model}$')
+                   axsp[spid].set_ylabel('$f_\\lambda [10^{{-{0:2.0f}}}~\\mathrm{{erg~s^{{-1}}~cm^{{-2}}~\\AA^{{-1}}}}]$'.format(np.log10(spfscale)))
+
+                   axsr[spid].set_ylabel('$f_\\lambda-f_\\mathrm{model}$')
+
                    if spid == temp.n_spec -1:
-                      axsr[spid].set_xlabel(r'$\mathrm{Observed~Wavelength}~[\mathrm{\AA}]$')
+                      axsr[spid].set_xlabel('$\\mathrm{Observed~Wavelength}~[\\mathrm{\\AA}]$')
+
                    
                    for tick in axsp[spid].xaxis.get_major_ticks():
                        tick.label1On=False
@@ -1016,8 +1049,10 @@ for ind in range(nobj):
                phyrange = np.array([1e6,2e11])
 
             ax1.axis([phxmin, phxmax, phyrange[0],phyrange[1]])
-            ax1.set_xlabel(r'$\mathrm{Observed~Wavelength}~[\mu \mathrm{m}]$')
-            ax1.set_ylabel(r'$\lambda~L_\lambda [L_\odot]$')
+            ax1.set_xlabel('$\\mathrm{Observed~Wavelength}~[\\mu \\mathrm{m}]$')
+
+            ax1.set_ylabel('$\\lambda~L_\\lambda [L_\\odot]$')
+
             
             pl.savefig(plotdir+'id{0}_summary_minimal.pdf'.format(obj), bbox_inches='tight')
 
@@ -1204,10 +1239,10 @@ for ind in range(nobj):
             print('      RESULTS Reduced Phot Chi square: {0:7.3f}'.format(photo_chisq))
                         
             if args.overrideid:
-                fig.text(0.08, 0.94-0.005*temp.n_spec, r'${0} ~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
+                fig.text(0.08, 0.94-0.005*temp.n_spec, '${0} ~~~~~  \\log(M_*) = {2:.2f} ~~~~~ \\log(SFR) = {3:.3f} $' \
                      .format(args.overrideid, this_obj_z, meds[mstarind], medlsfr), transform=fig.transFigure)
             else:
-               fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~  \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} $'\
+               fig.text(0.08, 0.94-0.005*temp.n_spec, '$\\mathrm{{ID}} = {0}~~~~~  \\log(M_*) = {2:.2f} ~~~~~ \\log(SFR) = {3:.3f} $' \
                      .format(obj, this_obj_z, meds[mstarind], medlsfr), transform=fig.transFigure)
             
             
@@ -1245,10 +1280,13 @@ for ind in range(nobj):
                    axsp[spid].xaxis.set_major_locator(MultipleLocator(500))
                    axsp[spid].xaxis.set_minor_locator(MultipleLocator(100))
                    
-                   axsp[spid].set_ylabel(r'$f_\lambda [10^{{-{0:2.0f}}}~\mathrm{{erg~s^{{-1}}~cm^{{-2}}~\AA^{{-1}}}}]$'.format(np.log10(spfscale)))
-                   axsr[spid].set_ylabel(r'$f_\lambda-f_\mathrm{model}$')
+                   axsp[spid].set_ylabel('$f_\\lambda [10^{{-{0:2.0f}}}~\\mathrm{{erg~s^{{-1}}~cm^{{-2}}~\\AA^{{-1}}}}]$'.format(np.log10(spfscale)))
+
+                   axsr[spid].set_ylabel('$f_\\lambda-f_\\mathrm{model}$')
+
                    if spid == temp.n_spec -1:
-                      axsr[spid].set_xlabel(r'$\mathrm{Observed~Wavelength}~[\mathrm{\AA}]$')
+                      axsr[spid].set_xlabel('$\\mathrm{Observed~Wavelength}~[\\mathrm{\\AA}]$')
+
                    
                    for tick in axsp[spid].xaxis.get_major_ticks():
                        tick.label1On=False
@@ -1343,11 +1381,15 @@ for ind in range(nobj):
             
             
             ax1.axis([phxmin, phxmax, phyrange[0],phyrange[1]])
-            ax1.set_xlabel(r'$\mathrm{Observed~Wavelength}~[\mu \mathrm{m}]$')
-            ax1.set_ylabel(r'$\lambda~L_\lambda [L_\odot]$')
+            ax1.set_xlabel('$\\mathrm{Observed~Wavelength}~[\\mu \\mathrm{m}]$')
+
+            ax1.set_ylabel('$\\lambda~L_\\lambda [L_\\odot]$')
+
             
-            ax4.set_xlabel(r'$\mathrm{{Lookback~Time~[{}]}}$'.format(temp.timeunit))
-            ax4.set_ylabel(r'$SFR~\mathrm{[M_\odot~yr^{-1}]}$')
+            ax4.set_xlabel('$\\mathrm{{Lookback~Time~[{}]}}$'.format(temp.timeunit))
+
+            ax4.set_ylabel('$SFR~\\mathrm{[M_\\odot~yr^{-1}]}$')
+
                                
             if 'nucleus' in (args.overrideid).lower():
                print('NUCLEUS')
@@ -1391,8 +1433,10 @@ for ind in range(nobj):
             ax5.axvline(meds[indy], color='firebrick', lw=1)
             ax5.axhline(meds[indx], color='firebrick', lw=1)
  
-            ax5.set_xlabel(r'$\mathrm{{{}~{}}}$'.format(parx_str,parx_unit))
-            ax5.set_ylabel(r'$\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
+            ax5.set_xlabel('$\\mathrm{{{}~{}}}$'.format(parx_str,parx_unit))
+
+            ax5.set_ylabel('$\\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
+
             
             pl.savefig(plotdir+'id{0}_summary.pdf'.format(obj), bbox_inches='tight')
             pl.close()
