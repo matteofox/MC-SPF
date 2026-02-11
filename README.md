@@ -4,13 +4,13 @@ MC-SPF is a Python-based tool for fitting Spectral Energy Distributions (SEDs) o
 
 ## Features
 
--   **Multi-Modal Fitting**: Fit photometry (`FITPHOT`), spectroscopy (`FITSPEC`), or both simultaneous (`FIT`).
+-   **Multi-Modal Fitting**: Fit photometry and spectroscopy.
 -   **Robust Solvers**: Supports multiple nested sampling backends:
-    -   `multinest` (via `pymultinest`) - Default, robust for multimodal posteriors.
+    -   `multinest` (via `pymultinest`) - Default, robust for multimodal posteriors. Supports parallel processing via mpirun
     -   `dynesty` (via `dynesty`) - Pure Python dynamic nested sampling, supports parallel processing.
     -   `ultranest` - For high-dimensional problems (experimental support).
--   **Parallel Processing**: Accelerate `dynesty` fits using multiple CPU cores with the `--ncores` flag.
--   **Visualization**: Comprehensive plotting modes (`PLOT`) to visualize SEDs, Star Formation Histories (SFHs), and corner plots of posterior distributions.
+-   **Parallel Processing**: Accelerate `dynesty` fits using multiple CPU cores with the `--ncores` flag. For `multinest`, use `mpirun -np X mc-spf ...`.
+-   **Visualization**: Includes plotting tools (`PLOT`) to visualize SEDs, Star Formation Histories (SFHs), and corner plots of posterior distributions.
 -   **Modular Design**: Easily extensible for new models and filters.
 
 ## Installation
@@ -55,9 +55,8 @@ mc-spf <CATALOG> <FILTERS> <MODE> [OPTIONS]
 -   `FIT`: Standard fitting mode (Simultaneous Photometry + Spectroscopy if available).
 -   `FITPHOT`: Fit only Photometric data.
 -   `FITSPEC`: Fit only Spectroscopic data.
--   `PLOT`: Plot results from a previous fit (requires `post_equal_weights.dat` and `stats.dat`).
+-   `PLOT`: Plot results from a previous fit (requires outputs from FIT, at least`post_equal_weights.dat` and `stats.dat`).
 -   `PLOTMINIMAL`: Simplified plotting mode.
--   `WRTMODELS`: Write best-fit model spectra to FITS files.
 
 ### Key Options
 
@@ -67,6 +66,8 @@ mc-spf <CATALOG> <FILTERS> <MODE> [OPTIONS]
 -   `--objlist <ID>`: Run only for specific object IDs (comma-separated, e.g., `1741,770`).
 -   `--nlive <N>`: Number of live points for the sampler (default: 500).
 -   `--sampeff <FLOAT>`: Sampling efficiency (default: 0.7).
+-   `--write_models`: Write best-fit model spectra to FITS files.
+    Use '-h' to see more options.
 
 ## Examples
 
@@ -96,8 +97,6 @@ Generate summary plots for the fitted object. This mode automatically detects th
 cd testdata
 mc-spf TESTDATA_phot.fits filters.txt PLOT --objlist 1741
 ```
-
-*The `PLOT` mode is designed to work without requiring the full `pymultinest` or `dynesty` libraries installed if only visualizing results, thanks to the internal `SimpleAnalyzer`.*
 
 ## Output Structure
 
