@@ -671,18 +671,26 @@ class sps_spec_fitter:
         
         return linLam*fact
     
+    def _scale_cube_dy(self, cube):
+
+        sc_cube = np.copy(cube)
+        for ii in range(self.ndims):
+            sc_cube[ii] = sc_cube[ii]*np.ptp(self.bounds[ii]) + np.min(self.bounds[ii])
+        return sc_cube
+
+
     #This should be used with MultiNest 
     def _scale_cube_mn(self, cube, ndims, nparams):
         for ii in range(ndims):
             cube[ii] = cube[ii]*np.ptp(self.bounds[ii]) + np.min(self.bounds[ii])
 
         return
-    
+
     #This should be used with UltraNest
     def _scale_cube_un(self, cube):
         sc_cube = np.copy(cube)
         for ii in range(self.ndims):
-            sc_cube[ii] = sc_cube[ii]*self.bounds[ii].ptp() + np.min(self.bounds[ii])
+            sc_cube[ii] = sc_cube[ii]*np.ptp(self.bounds[ii]) + np.min(self.bounds[ii])
         return sc_cube
 
     def _losvd_rfft(self, vel, sigma, spid):
@@ -884,6 +892,11 @@ class sps_spec_fitter:
         
         return spec_lhood + phot_lhood + pr
     
+    #This should be used with Dynesty
+    def lnlhood_dy(self, p):
+        
+        return  self.lnlhood_worker(p)
+
     #This should be used with Multinest
     def lnlhood_mn(self, p, ndim, nparams):
         
