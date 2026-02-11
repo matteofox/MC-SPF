@@ -158,6 +158,7 @@ grpplt = parser.add_argument_group('Plot related arguments')
 
 grpplt.add_argument('--spxrange',   default= None,    help='X-axis (Wave) range for spectra plots')
 grpplt.add_argument('--spyrange',   default= None,    help='Y-axis (Flux) range for spectra plots')
+grpinp.add_argument('--spfplot',    default= None,    help='The flux unit for plotting. Will be compared to the input unit and spectra will be scaled if required ')
 grpplt.add_argument('--phxrange',   default= None,    help='X-axis (Wave) range for photometry plot')
 grpplt.add_argument('--phyrange',   default= None,    help='Y-axis (Luminosity) range for photometry plot')
 grpplt.add_argument('--timerange',  default= None,    help='X-axis (Time) range for SFH plot')
@@ -329,7 +330,7 @@ else:
 
 
 #Open filter file
-ffilt = np.loadtxt(args.filtfile, dtype=object) 
+ffilt = np.loadtxt(args.filtfile, dtype=object, ndmin=2) 
 fsps_filt = dict(zip(ffilt[:,0], ffilt[:,1]))
 
 #Scale flux units
@@ -576,11 +577,11 @@ for ind in range(nobj):
               axsr = [fig.add_axes([0.08,0.65,0.89,0.06]),fig.add_axes([0.08,0.35,0.89,0.06])] 
               
               #Photometry plot
-              ax1 = fig.add_axes([0.08,0.08,0.38,0.21])
+              ax1 = fig.add_axes([0.08,0.08,0.37,0.21])
               ax1.set_xscale('log')
               ax1.set_yscale('log')
               ax1.xaxis.set_major_formatter(StrMethodFormatter(r'${x:.1f}$'))
-              ax1.xaxis.set_minor_formatter(StrMethodFormatter(r'${x:.1f}$'))
+              #ax1.xaxis.set_minor_formatter(StrMethodFormatter(r'${x:.1f}$'))
                             
               #SFH and corner plot
               ax4 = fig.add_axes([0.51,0.08,0.25,0.21])
@@ -627,6 +628,8 @@ for ind in range(nobj):
             photo_chisq /= len(this_obj_flux)
             
             print('      RESULTS Reduced Phot Chi square: {0:7.3f}'.format(photo_chisq))
+            
+            #print(((oflux_lam-mflux)/oflux_err_lam)**2)
                         
             if np.isfinite(lnz) and np.isfinite(dlnz):
               fig.text(0.08, 0.94-0.005*temp.n_spec, r'$\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \log(M_*) = {2:.2f} ~~~~~ \log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f} ~~~~~ \ln Z = {5:.2f}\pm{6:.2f}$'\
@@ -637,6 +640,9 @@ for ind in range(nobj):
             
             
             spfscale = 1./temp.spfunit 
+            if args.spfplot != None:
+               spfscale = 1./float(args.spfplot) 
+              
             
             if temp.n_spec > 0 :
                
@@ -709,7 +715,6 @@ for ind in range(nobj):
             
             #Set number and index of random samples
             rsamples = np.random.randint(values.shape[0], size=args.nsampwrite)
-            print(temp.pivot_wl)
             phxmin = 0.8*np.nanmin(temp.pivot_wl/1e4)
             phxmax = 1.2*np.nanmax(temp.pivot_wl/1e4)
 

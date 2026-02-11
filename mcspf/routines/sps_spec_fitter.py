@@ -543,7 +543,7 @@ class sps_spec_fitter:
         mlam_lin = (high_lin+low_lin)/2.
         
         scaled_lambda = (log_wl - mlam_log) * 2/slam_log
-        poly_deg = min(int((high_lin - low_lin)/150.), polymax)
+        poly_deg = min(int((high_lin - low_lin)/100.), polymax)
         
         #normalize the observed spectrum
         #norm_window = ((log_wl > np.log10(mlam_lin-125)) & (log_wl < np.log10(mlam_lin+125)))
@@ -856,14 +856,16 @@ class sps_spec_fitter:
             spec_lhood += -0.5*np.nansum((ispec2*(self.log_obj[ss]-model_spec)**2 - np.log(ispec2) + np.log(2.*np.pi))[self.goodpix_spec[ss]])
                   
            
-        model_phot, _ = self.reconstruct_phot(p, self.ndims)
+        if self.fit_phot == True:
+          
+          model_phot, _ = self.reconstruct_phot(p, self.ndims)
          
-        if np.all(model_phot == 0.) or np.any(~np.isfinite(model_phot)):
-           return -np.inf
+          if np.all(model_phot == 0.) or np.any(~np.isfinite(model_phot)):
+             return -np.inf
 
-        iphot2 = 1./(self.eflux_obs**2)
+          iphot2 = 1./(self.eflux_obs**2)
          
-        if np.sum(self.lim_obs):
+          if np.sum(self.lim_obs):
              terf = 0.5*(1.+erf((self.eflux_obs-model_phot)/np.sqrt(2.)/self.eflux_obs))[self.lim_obs == 1]
              if np.any(terf == 0):
                  return -np.inf
@@ -871,7 +873,7 @@ class sps_spec_fitter:
                  phot_lhood = np.nansum(-0.5*((iphot2*(self.flux_obs-model_phot)**2)[self.lim_obs == 0] - \
                          np.log(iphot2[self.lim_obs == 0]) + np.log(2.*np.pi))) + \
                          np.nansum(np.log(terf))
-        else:
+          else:
              phot_lhood = -0.5*np.nansum(((iphot2*(self.flux_obs-model_phot)**2) - np.log(iphot2) + np.log(2.*np.pi)))
         
         #### APPLY THE PRIOR HERE  #####
