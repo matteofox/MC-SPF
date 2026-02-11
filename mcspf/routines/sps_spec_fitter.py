@@ -307,7 +307,7 @@ class sps_spec_fitter:
             self.dh_dustemm[ii,:] = np.interp(self.wl, dh_wl, tdust)/self.wl
 
         #normalize to Lbol = 1
-        norm = np.trapz(self.dh_dustemm, self.wl)
+        norm = np.trapezoid(self.dh_dustemm, self.wl)
         self.dh_dustemm /= norm[:,None]
         
         #### END LOAD DUST EMISSION TABLES ####        
@@ -773,20 +773,20 @@ class sps_spec_fitter:
             trans_interp = np.asarray(np.interp(self.red_wl, fwl, ftrans, left=0., right=0.), dtype=float) 
 
             #normalize transmission
-            ttrans = np.trapz(np.copy(trans_interp)*self.red_wl, self.red_wl) #for integrating f_lambda
+            ttrans = np.trapezoid(np.copy(trans_interp)*self.red_wl, self.red_wl) #for integrating f_lambda
             if ttrans < self.small_num: ttrans = 1.
             ntrans = np.maximum(trans_interp / ttrans, 0.0)
             
             if 'mips' in filt:
-                td = np.trapz(((fobj.lambda_eff/self.red_wl)**(2.))*ntrans*self.red_wl, self.red_wl)
+                td = np.trapezoid(((fobj.lambda_eff/self.red_wl)**(2.))*ntrans*self.red_wl, self.red_wl)
                 ntrans = ntrans/max(1e-70,td)
 
             if 'irac' in filt or 'pacs' in filt or 'spire' in filt or 'iras' in filt: 
-                td = np.trapz(((fobj.lambda_eff/self.red_wl)**(1.))*ntrans*self.red_wl, self.red_wl)
+                td = np.trapezoid(((fobj.lambda_eff/self.red_wl)**(1.))*ntrans*self.red_wl, self.red_wl)
                 ntrans = ntrans/max(1e-70,td)
             
             #Calculate pivot wavelength following equation lam_pivot from SVO filter service
-            pivot_wl = np.sqrt(np.trapz(ntrans, self.red_wl) / np.trapz(ntrans / self.red_wl**2, self.red_wl))
+            pivot_wl = np.sqrt(np.trapezoid(ntrans, self.red_wl) / np.trapezoid(ntrans / self.red_wl**2, self.red_wl))
             bands[ii,:] = ntrans
             pivot[ii] = pivot_wl
         
@@ -906,7 +906,7 @@ class sps_spec_fitter:
     def _get_clyman(self, spec, fesc): #compute number of Lyman continuum photons
         #spectrum in erg/s/cm2/A so it returns the flux of ionizing photons not the rate
         lycont_spec = np.interp(self.lycont_wls, self.wl, spec) 
-        nlyman = np.trapz(lycont_spec*self.lycont_wls, self.lycont_wls)/self.h/self.clight
+        nlyman = np.trapezoid(lycont_spec*self.lycont_wls, self.lycont_wls)/self.h/self.clight
  
         #modify input spectrum to remove photons 
         if fesc>0:
@@ -1046,8 +1046,8 @@ class sps_spec_fitter:
         self.dusty_phot       = self.dusty_phot_young + self.dusty_phot_old
         
         #### THERMAL DUST EMISSION ####
-        lbol_init = np.trapz(temp_young+temp_old+emm_young+emm_old, self.wl)
-        lbol_att  = np.trapz(self.dusty_phot, self.wl)
+        lbol_init = np.trapezoid(temp_young+temp_old+emm_young+emm_old, self.wl)
+        lbol_att  = np.trapezoid(self.dusty_phot, self.wl)
 
         dust_emm = (lbol_init - lbol_att)
         tdust_phot = _interp.interp(self.dh_dustemm, (ialpha,), (self.dh_alpha,))
@@ -1059,7 +1059,7 @@ class sps_spec_fitter:
         tdust_phot -= scale*spec_model
         tdust_phot[(self.wl < 2.5e4) | (tdust_phot < 0.)] = 0.
         
-        norm = np.trapz(tdust_phot, self.wl) 
+        norm = np.trapezoid(tdust_phot, self.wl) 
 
         dust_phot = np.copy(tdust_phot) * dust_emm / norm
         tdust_phot = 0.
@@ -1072,8 +1072,8 @@ class sps_spec_fitter:
 
             tdust_phot += dust_phot
             
-            lboln = np.trapz(dust_phot, self.wl)
-            lbolo = np.trapz(idust_phot, self.wl)
+            lboln = np.trapezoid(dust_phot, self.wl)
+            lbolo = np.trapezoid(idust_phot, self.wl)
             dust_phot = np.maximum(tdust_phot*(lbolo-lboln)/norm, self.small_num) 
             icnt += 1
 

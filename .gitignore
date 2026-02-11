@@ -131,3 +131,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .DS_Store
+
+# Test data
+testdata/Fits
+testdata/Plots

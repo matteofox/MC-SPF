@@ -65,7 +65,7 @@ class Filter(object):
         lam, trans = TRANS_CACHE[self.name]
         
         #This applies for photon counting device
-        return np.sqrt(np.trapz(lam*trans, lam)/np.trapz(trans/lam, lam))
+        return np.sqrt(np.trapezoid(lam*trans, lam)/np.trapezoid(trans/lam, lam))
          
         
 
