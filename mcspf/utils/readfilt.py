@@ -13,7 +13,8 @@ __all__ = ["init_filters", "find_filter", "get_filter", "list_filters"]
 
 import os
 import numpy as np
-from pkg_resources import resource_stream, resource_exists
+
+
 
 
 # Cache for $SPS_HOME/data/filter_lambda_eff.dat parsed by numpy
@@ -64,7 +65,7 @@ class Filter(object):
         lam, trans = TRANS_CACHE[self.name]
         
         #This applies for photon counting device
-        return np.sqrt(np.trapz(lam*trans, lam)/np.trapz(trans/lam, lam))
+        return np.sqrt(np.trapezoid(lam*trans, lam)/np.trapezoid(trans/lam, lam))
          
         
 

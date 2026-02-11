@@ -1,0 +1,10 @@
+MB muse_blue
+MG muse_green
+MR muse_red
+MIR muse_nir
+F140W hst_wfc3_ir_f140w
+F125W hst_wfc3_ir_f125w
+F336W hst_wfc3_uvis_f336w
+F450W hst_wfpc2_f450w
+F702W hst_wfpc2_f702w
+Ks hawki_ks
