@@ -7,7 +7,7 @@ MC-SPF is a Python-based tool for fitting Spectral Energy Distributions (SEDs) o
 -   **Multi-Modal Fitting**: Fit photometry and spectroscopy.
 -   **Robust Solvers**: Supports multiple nested sampling backends:
     -   `multinest` (via `pymultinest`) - Default, robust for multimodal posteriors. Supports parallel processing via mpirun
-    -   `dynesty` (via `dynesty`) - Pure Python dynamic nested sampling, supports parallel processing.
+    -   `dynesty` (DEFAULT) - Pure Python dynamic nested sampling, supports parallel processing.
     -   `ultranest` - For high-dimensional problems (experimental support).
 -   **Parallel Processing**: Accelerate `dynesty` fits using multiple CPU cores with the `--ncores` flag. For `multinest`, use `mpirun -np X mc-spf ...`.
 -   **Visualization**: Includes plotting tools (`PLOT`) to visualize SEDs, Star Formation Histories (SFHs), and corner plots of posterior distributions.
@@ -20,7 +20,7 @@ MC-SPF is a Python-based tool for fitting Spectral Energy Distributions (SEDs) o
 Ideally, use a dedicated Conda environment:
 
 ```bash
-conda create -n mcspf python=3.9 numpy scipy matplotlib astropy
+conda create -n mcspf python=3.13
 conda activate mcspf
 ```
 
@@ -31,7 +31,7 @@ Clone the repository and install the package:
 ```bash
 git clone https://github.com/matteofox/MC-SPF.git
 cd MC-SPF
-pip install .
+python -m pip install .
 ```
 
 *Note: If you encounter build isolation issues, try installing with `pip install . --no-build-isolation`.*
@@ -61,7 +61,7 @@ mc-spf <CATALOG> <FILTERS> <MODE> [OPTIONS]
 ### Key Options
 
 -   `--outdir <DIR>`: Directory for output files (default: `./`).
--   `--solver <SOLVER>`: Choose nested sampling backend. Options: `multinest` (default), `dynesty`, `ultranest`.
+-   `--solver <SOLVER>`: Choose nested sampling backend. Options: `dynesty` (default), `multinest`, `ultranest`.
 -   `--ncores <N>`: Number of cores to use for `dynesty` solver (default: 1).
 -   `--objlist <ID>`: Run only for specific object IDs (comma-separated, e.g., `1741,770`).
 -   `--nlive <N>`: Number of live points for the sampler (default: 500).
@@ -73,7 +73,7 @@ mc-spf <CATALOG> <FILTERS> <MODE> [OPTIONS]
 
 ### 1. Simple Fit with Multinest
 
-Fit object 1741 from the test catalog using the default `multinest` solver:
+Fit object 1741 from the test catalog using the default `dynesty` solver:
 
 ```bash
 cd testdata
@@ -86,7 +86,7 @@ Fit the same object using `dynesty` on 4 cores:
 
 ```bash
 cd testdata
-mc-spf TESTDATA_phot.fits filters.txt FIT --solver dynesty --ncores 4 --objlist 1741
+mc-spf TESTDATA_phot.fits filters.txt FIT --ncores 4 --objlist 1741
 ```
 
 ### 3. Visualizing Results
@@ -106,5 +106,6 @@ The code generates two main output directories:
 
 ## Authors
 
--   Matteo Fossati
--   J.T. Mendel
+-   Matteo Fossati (UNIMIB) Contact for correspondence matteo.fossati@unimib.it
+-   J.T. Mendel (ANU)
+-   Davide Tornotti (UNIMIB)

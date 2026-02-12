@@ -11,10 +11,7 @@ from matplotlib.ticker import MultipleLocator, ScalarFormatter, StrMethodFormatt
 from scipy.interpolate import interp1d
 from astropy.cosmology import FlatLambdaCDM
 import itertools
-try:
-  import corner as triangle
-except:
-  import triangle
+import corner
 
 from mcspf.routines import sps_spec_fitter
 from mcspf.routines import sfh as sfh
@@ -157,13 +154,13 @@ if __name__ == "__main__":
     grpinp.add_argument('--emimetal',  default= 0.02,  type=float, help='Emission line metallicity Default = 0.02 (Solar value)')
     grpinp.add_argument('--emimodel',  default= '2017',  help="Emission line CLOUDY table (can only be '2017' or '2018') ")
     grpinp.add_argument('--useleitatt',dest='useleitatt',  action = 'store_true', help='If set, use the Leitherer et al. (2002) attenuation curve below 1500A.')
-    grpinp.add_argument('--dustemimodel',default= 'dh02',  help="Dust Emission model to be used (can only be 'DH02' or 'DL14')")
+    grpinp.add_argument('--dustemimodel',default= 'DH02',  help="Dust Emission model to be used (can only be 'DH02' or 'DL14')")
     grpinp.add_argument('--debug',     dest='debug',  action = 'store_true', help='Verbose mode for debugging.')
     
     
     grpfit = parser.add_argument_group('Fit related arguments')
     
-    grpfit.add_argument('--solver',    default= 'multinest',  help='The Nested Sampling code to be used to traverse the parameter space. Default=multinest. Other Option=ultranest')
+    grpfit.add_argument('--solver',    default= 'dynesty',  help='The Nested Sampling code to be used to traverse the parameter space. Default=dynesty. Other Option=multinest or ultranest')
     grpfit.add_argument('--ncores',    default= 1,   type=int,     help='Number of cores to be used for the Dynesty solver. Default=1')
     grpfit.add_argument('--nlive',     default= 500,   type=int,   help='Number of live points in the Multinest solver, default=500')
     grpfit.add_argument('--sampeff',   default= 0.7,   type=float, help='Sampling efficiency in the Multinest solver. Lower is more \
@@ -881,7 +878,7 @@ if __name__ == "__main__":
     
                         
                 #Plot Tquench Tauquench covariance plot
-                triangle.hist2d(values[:,1], values[:,0], ax=ax5)
+                corner.hist2d(values[:,1], values[:,0], ax=ax5)
                 ax5.axvline(meds[1], color='firebrick', lw=1)
                 ax5.axhline(meds[0], color='firebrick', lw=1)
                 
@@ -1484,7 +1481,7 @@ if __name__ == "__main__":
                    parx_unit = '[Myr]'
              
                 #Plot Tquench Tauquench covariance plot
-                triangle.hist2d(values[:,indy], values[:,indx], ax=ax5)
+                corner.hist2d(values[:,indy], values[:,indx], ax=ax5)
                 ax5.axvline(meds[indy], color='firebrick', lw=1)
                 ax5.axhline(meds[indx], color='firebrick', lw=1)
      
