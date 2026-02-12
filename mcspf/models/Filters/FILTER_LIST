@@ -117,93 +117,105 @@
 117     Idealized 1500A  (15% bandwidth, FWHM = 225A from M. Dickinson)
 118     Idealized 2300A  (15% bandwidth, FWHM = 345A from M. Dickinson)
 119     Idealized 2800A  (15% bandwidth, FWHM = 420A from M. Dickinson)
-120     JWST F070W 
-121     JWST F090W 
-122     JWST F115W 
-123     JWST F150W 
-124     JWST F200W 
-125     JWST F277W 
-126     JWST F356W 
-127     JWST F444W 
-128     JWST F150W2
-129     JWST F322W2
-130     CFHT WIRCAM J
-131     CFHT WIRCAM Ks
-132     VISTA Y
-133     VISTA J
-134     VISTA H
-135     VISTA K
-136     ISAAC Js
-137     ISAAC H
-138     NMBS J1
-139     NMBS J2
-140     NMBS J3
-141     NMBS H1
-142     NMBS H2
-143     NMBS Ks
-144     Subaru SuprimeCam IA427
-145     Subaru SuprimeCam IA445
-146     Subaru SuprimeCam IA464
-147     Subaru SuprimeCam IA484
-148     Subaru SuprimeCam IA505
-149     Subaru SuprimeCam IA527
-150     Subaru SuprimeCam IA550
-151     Subaru SuprimeCam IA574
-152     Subaru SuprimeCam IA598
-153     Subaru SuprimeCam IA624
-154     Subaru SuprimeCam IA651
-155     Subaru SuprimeCam IA679
-156     Subaru SuprimeCam IA709
-157     Subaru SuprimeCam IA738
-158     Subaru SuprimeCam IA767
-159     Subaru SuprimeCam IA797
-160     Subaru SuprimeCam IA827
-161     Subaru SuprimeCam IA856
-162     Subaru SuprimeCam IA907
-163     VIMOS U
-164     VIMOS R
-165     Subaru Bj
-166     Subaru Vj
-167     Subaru r+
-168     Subaru i+
-169     Subaru z+
-170     WFI U38
-171     WFI B99
-172     WFI V
-173     WFI Rc
-174     WFI Ic
-175     CFHT WIRCAM H
-176     WFI I EIS
-177     CAPAK Subaru B (cosmos-b) 
-178     CAPAK Subaru V (cosmos-v) 
-179     CAPAK Subaru r (cosmos-r) 
-180     CAPAK Subaru i (cosmos-i) 
-181     CAPAK Subaru z (cosmos-z) 
-182     LRIS g blue
-183     LRIS Rs red
-184     MOIRCS J
-185     MOIRCS H
-186     MOIRCS K
-187     MOSAIC U
-188     maiz U
-189     maiz B
-190     maiz V
-191     VISTA Z
-192	CFHT Megacam r  (New filter from 2014, curve made by M.Fossati)
-193     CFHT Megacam Ha (New filter from 2015, curve made by M.Fossati)
-194     MUSE BLUE  (tophat)
-195     MUSE GREEN (tophat)
-196     MUSE RED   (tophat)
-197     MUSE NIR   (tophat)
-198     MUSE WHITE AOE (from muse manual)
-199	UVIT FUV F154W (UVIT FUV BaF2 Filter, from Tandon et al. 2020, downloaded from SVO)
-200	UVIT NUV N245M (UVIT NUV B13 filter,  from Tandon et al. 2020, downloaded from SVO)
-201	UVIT NUV N263M (UVIT NUV B4 filter,   from Tandon et al. 2020, downloaded from SVO)
-202	HAWKI H
-203	HAWKI CH4
-204	HAWKI Ks (from eso website)
-205     JWST MIRI F770W
-206	JWST MIRI F1000W
-207	JWST MIRI F1280W
-208	JWST MIRI F1800W
-209	ALMA Band6 1p2mm
+120     JWST NIRCam F070W 
+121     JWST NIRCam F090W 
+122     JWST NIRCam F115W 
+123     JWST NIRCam F140M
+124     JWST NIRCam F150W
+125     JWST NIRCam F162M  
+126 	JWST NIRCam F182M 
+127     JWST NIRCam F200W 
+128     JWST NIRCam F210M 
+129	JWST NIRCam F250M 
+130     JWST NIRCam F277W 
+131     JWST NIRCam F300M
+132	JWST NIRCam F335M  
+133     JWST NIRCam F356W
+134     JWST NIRCam F360M
+135	JWST NIRCam F410M 
+136	JWST NIRCam F430M  
+137     JWST NIRCam F444W
+138     JWST NIRCam F460M
+139     JWST NIRCam F480M 
+140	JWST NIRCam F150W2
+141	JWST NIRCam F322W2
+142	CFHT WIRCAM J
+143	CFHT WIRCAM Ks
+144	VISTA Y
+145	VISTA J
+146	VISTA H
+147	VISTA K
+148	ISAAC Js
+149	ISAAC H
+150	NMBS J1
+151	NMBS J2
+152	NMBS J3
+153	NMBS H1
+154	NMBS H2
+155	NMBS Ks
+156	Subaru SuprimeCam IA427
+157	Subaru SuprimeCam IA445
+158	Subaru SuprimeCam IA464
+159	Subaru SuprimeCam IA484
+160	Subaru SuprimeCam IA505
+161	Subaru SuprimeCam IA527
+162	Subaru SuprimeCam IA550
+163	Subaru SuprimeCam IA574
+164	Subaru SuprimeCam IA598
+165	Subaru SuprimeCam IA624
+166	Subaru SuprimeCam IA651
+167	Subaru SuprimeCam IA679
+168	Subaru SuprimeCam IA709
+169	Subaru SuprimeCam IA738
+170	Subaru SuprimeCam IA767
+171	Subaru SuprimeCam IA797
+172	Subaru SuprimeCam IA827
+173	Subaru SuprimeCam IA856
+174	Subaru SuprimeCam IA907
+175	VIMOS U
+176	VIMOS R
+177	Subaru Bj
+178	Subaru Vj
+179	Subaru r+
+180	Subaru i+
+181	Subaru z+
+182	WFI U38
+183	WFI B99
+184	WFI V
+185	WFI Rc
+186	WFI Ic
+187	CFHT WIRCAM H
+188	WFI I EIS
+189	CAPAK Subaru B (cosmos-b) 
+190	CAPAK Subaru V (cosmos-v) 
+191	CAPAK Subaru r (cosmos-r) 
+192	CAPAK Subaru i (cosmos-i) 
+193	CAPAK Subaru z (cosmos-z) 
+194	LRIS g blue
+195	LRIS Rs red
+196	MOIRCS J
+197	MOIRCS H
+198	MOIRCS K
+199	MOSAIC U
+200	maiz U
+201	maiz B
+202	maiz V
+203	VISTA Z
+204	CFHT Megacam r  (New filter from 2014, curve made by M.Fossati)
+205	CFHT Megacam Ha (New filter from 2015, curve made by M.Fossati)
+206	MUSE BLUE  (tophat)
+207	MUSE GREEN (tophat)
+208	MUSE RED   (tophat)
+209	MUSE NIR   (tophat)
+210     MUSE WHITE AOE (from muse manual)
+211     UVIT FUV F154W (UVIT FUV BaF2 Filter, from Tandon et al. 2020, downloaded from SVO)
+212     UVIT NUV N245M (UVIT NUV B13 filter,  from Tandon et al. 2020, downloaded from SVO)
+213     UVIT NUV N263M (UVIT NUV B4 filter,   from Tandon et al. 2020, downloaded from SVO)
+214     HAWKI H
+215     HAWKI CH4
+216     HAWKI Ks (from eso website)
+217     JWST MIRI F770W
+218     JWST MIRI F1000W
+219     JWST MIRI F1280W
+220     JWST MIRI F1800W
+221     ALMA Band6 1p2mm

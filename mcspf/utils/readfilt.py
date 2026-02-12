@@ -17,7 +17,6 @@ import numpy as np
 
 
 
-# Cache for $SPS_HOME/data/filter_lambda_eff.dat parsed by numpy
 LAMBDA_EFF_TABLE = None
 
 # Cache for bandpass transmission listings: a dictionary keyed by bandpass
