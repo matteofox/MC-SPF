@@ -213,9 +213,31 @@ if __name__ == "__main__":
     
     #Check solver and load packages
     if args.solver == 'ultranest':
+      
       import ultranest            
+    
     elif args.solver =='multinest':
+      
+      from ctypes import cdll
+    
+      libname = 'libmultinest'
+      libname += {
+	'darwin' : '.dylib',
+	'win32'  : '.dll',
+	'cygwin' : '.dll',
+      }.get(sys.platform, '.so')
+    
+      lib = cdll.LoadLibrary(libname)
+      try:
+        lib = cdll.LoadLibrary(libname)
+      except:
+        print('ERROR:   Could not load MultiNest library')
+        print('ERROR:   You have to build it first and link it to your LD_LIBRARY_PATH')
+        print('ERROR:   Instructions at: http://johannesbuchner.github.com/PyMultiNest/install.html')
+      
+      
       import pymultinest
+      
     elif args.solver =='dynesty':
       import dynesty
       import dynesty.utils as dyfunc  

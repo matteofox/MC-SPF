@@ -106,7 +106,6 @@ if __name__ == "__main__":
       print('ERROR:   Could not load MultiNest library')
       print('ERROR:   You have to build it first and link it to your LD_LIBRARY_PATH')
       print('ERROR:   Instructions at: http://johannesbuchner.github.com/PyMultiNest/install.html')
-      sys.exit(1)
     
     with open('mcspf/_version.py') as f:
       exec(f.read())
