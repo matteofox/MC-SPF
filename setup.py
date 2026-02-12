@@ -90,23 +90,7 @@ if __name__ == "__main__":
     cmdclass = {'clean': CleanCommand,
                 'build_ext': build_ext}
     
-    from ctypes import cdll
-    
-    libname = 'libmultinest'
-    libname += {
-	'darwin' : '.dylib',
-	'win32'  : '.dll',
-	'cygwin' : '.dll',
-    }.get(sys.platform, '.so')
-    
-    lib = cdll.LoadLibrary(libname)
-    try:
-      lib = cdll.LoadLibrary(libname)
-    except:
-      print('ERROR:   Could not load MultiNest library')
-      print('ERROR:   You have to build it first and link it to your LD_LIBRARY_PATH')
-      print('ERROR:   Instructions at: http://johannesbuchner.github.com/PyMultiNest/install.html')
-    
+     
     with open('mcspf/_version.py') as f:
       exec(f.read())
       

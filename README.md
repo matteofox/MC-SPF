@@ -29,7 +29,7 @@ conda activate mcspf
 Clone the repository and install the package:
 
 ```bash
-git clone https://github.com/yourusername/MC-SPF.git
+git clone https://github.com/matteofox/MC-SPF.git
 cd MC-SPF
 pip install .
 ```
