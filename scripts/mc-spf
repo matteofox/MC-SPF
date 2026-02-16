@@ -149,9 +149,9 @@ if __name__ == "__main__":
     grpinp.add_argument('--objlist',   default= None,  help='String with the IDs of the objects to fit separated by a space')
     grpinp.add_argument('--sfh',       default= 'exp', help='The form of the SFH, allowed values are exp for exponential, del \
                                                              for delayed tau models, or a fits file for custom made sfhs default=exp')
-    grpinp.add_argument('--funit',     default= 'mJy', help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy')
-    grpinp.add_argument('--spfunit',   default= 1E-20, help='The flux unit of the input spectrum, default = 1E-20')
-    grpinp.add_argument('--emimetal',  default= 0.02,  type=float, help='Emission line metallicity Default = 0.02 (Solar value)')
+    grpinp.add_argument('--funit',     default= 'mJy', help='The flux unit of the input photometry, values allowed: mJy, uJy, nJy. Default = mJy')
+    grpinp.add_argument('--spfunit',   default= 1E-20, help='The flux unit of the input spectrum. Default = 1E-20')
+    grpinp.add_argument('--emimetal',  default= 0.02,  type=float, help='Emission line metallicity. Default = 0.02 (Solar value)')
     grpinp.add_argument('--emimodel',  default= '2017',  help="Emission line CLOUDY table (can only be '2017' or '2018') ")
     grpinp.add_argument('--useleitatt',dest='useleitatt',  action = 'store_true', help='If set, use the Leitherer et al. (2002) attenuation curve below 1500A.')
     grpinp.add_argument('--dustemimodel',default= 'DH02',  help="Dust Emission model to be used (can only be 'DH02' or 'DL14')")
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     grpfit.add_argument('--fescrange',       default= None,  help='Multiplicative escape fraction Default = -0.5,0.5')
     grpfit.add_argument('--sigrange',        default= None,  help='Stellar sigma range Default = 1,500')
     grpfit.add_argument('--velrange',        default= None,  help='Stellar velocity offset range w.r.t. redshift value in input file. Default = -250,250 \
-    							       Very large values could cause issues in the fit. Please use caution.')
+    							       Very large values could cause issues in the fit. Please use with caution.')
     grpfit.add_argument('--refit',           default=False, help='If true fit also objects for which a fit already exists. Default=False.')
     
     grpplt = parser.add_argument_group('Plot related arguments')
@@ -308,8 +308,8 @@ if __name__ == "__main__":
             sfh_age_par = -1 #Means read it from the header
           except:
             sfh_age_par = 13500
-            print('WARNING: SFH Age is not a free parameter of this custom sfh and AGE is not given in the header.')
-            print('         SFRs will be incorrect.') 
+            print('      WARNING: SFH Age is not a free parameter of this custom sfh and AGE is not') 
+            print('               given in the header. SFRs will be incorrect.')
     else:
        print("ERROR: SFH not understood and is not a valid file. Aborting...")
        exit()
@@ -397,7 +397,7 @@ if __name__ == "__main__":
         try:
           catind = np.where(catalogue['id']==obj)[0][0]
         except:
-          print("WARNING: Object {} is missing from the input catalogue. Skipping...".format(obj))
+          print("      WARNING: Object {} is missing from the input catalogue. Skipping...".format(obj))
         
         this_obj_z = catalogue['z_best'][catind]
         
@@ -427,6 +427,10 @@ if __name__ == "__main__":
                errf = catalogue[col.replace('f_','e_')][catind] 
                
                if flux < -90:
+                 continue
+
+               if errf<0:
+                 print("      WARNING: Negative error for object {} band {}. Skipping this band.".format(obj, photband))
                  continue
                
                SNR = flux/errf
