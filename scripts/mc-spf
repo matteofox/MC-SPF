@@ -752,8 +752,8 @@ if __name__ == "__main__":
                        axsp[spid].plot(10**temp.log_wl[spid], totspec*temp.spec_norm[spid]*spfscale, '-', alpha=1.0, color='firebrick', lw=1.0, zorder=1.1)
                        
                        if spyrange[2*spid] == -1 and spyrange[2*spid+1] == -1:
-                          spyrange[2*spid]   = clean_spec.min()-0.1*clean_spec.ptp()
-                          spyrange[2*spid+1] = clean_spec.max()+zoom*clean_spec.ptp()
+                          spyrange[2*spid]   = clean_spec.min()-0.1*np.ptp(clean_spec)
+                          spyrange[2*spid+1] = clean_spec.max()+zoom*np.ptp(clean_spec)
                        
                        if spxrange[2*spid] == -1 and spxrange[2*spid+1] == -1:
                           spxrange[2*spid]   = (10**temp.log_wl[spid]).min()
