@@ -429,7 +429,7 @@ if __name__ == "__main__":
                if flux < -90:
                  continue
 
-               if errf<0:
+               if errf <= 0:
                  print("      WARNING: Negative error for object {} band {}. Skipping this band.".format(obj, photband))
                  continue
                
