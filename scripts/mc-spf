@@ -39,14 +39,25 @@ class SimpleAnalyzer:
                     break
         return stats 
 
-def fwritesed(temp, obj, mphot, this_obj_z, funit, plotdir, nsamp, nsampwrite):
+def fwritesed(temp, obj, mflux, mphot, this_obj_bands, this_obj_z, funit, plotdir, nsamp, nsampwrite):
 
-             print('      INFO FUNCTION Writing SEDs...')
-
+             print('      INFO: Writing SEDs...')
+            
+             if funit =='mJy':
+               scalefac = 1E26
+             elif funit =='uJy':
+               scalefac = 1E29
+             elif funit =='nJy':
+               scalefac = 1E32
+             elif funit =='Jy':
+               scalefac = 1E23
+             
              #Best SED
              msed_flam = mphot*temp.fscale #erg/cm2/s/A
-             msed_fnu  = msed_flam*temp.red_wl**2/temp.clight*1E26 #output in funit
+             msed_fnu  = msed_flam*temp.red_wl**2/temp.clight*scalefac #output in funit
             
+             #Best photometry, mflux is already in fnu and in the units required by the user for the photometry
+           
              col1 = fits.Column(name='wave_obs' , format='E', unit='Angstrom_vac',     array=temp.red_wl)
              col2 = fits.Column(name='wave_rest', format='E', unit='Angstrom_vac',     array=temp.red_wl/(1+this_obj_z))
              col3 = fits.Column(name='f_lam_obs', format='E', unit='erg/cm2/s/A',      array=msed_flam)
@@ -54,6 +65,11 @@ def fwritesed(temp, obj, mphot, this_obj_z, funit, plotdir, nsamp, nsampwrite):
              col5 = fits.Column(name='f_nu_obs',  format='E', unit=funit,              array=msed_fnu)
             
              hdu = fits.BinTableHDU.from_columns([col1, col2, col3, col4, col5])
+
+             for ind, band in enumerate(this_obj_bands):
+                hdu.header[f'F{ind}_FILT'] = band
+                hdu.header[f'F{ind}_FMOD'] = mflux[ind]
+
              hdu.writeto(plotdir+'id{0}_best_sed.fits'.format(obj), overwrite=True)
              
              if nsampwrite>0:
@@ -192,7 +208,8 @@ if __name__ == "__main__":
     grpout.add_argument('--fullout',   dest='fullout',  action = 'store_true', help='If set, the full MultiNest output is saved. Uses more disk space.')
     grpout.add_argument('--writesed',  dest='writesed', action = 'store_true', help='If set, write the best fit sed during the PLOT phase.')
     grpout.add_argument('--writesfh',  dest='writesfh', action = 'store_true', help='If set, write the best fit sfh during the PLOT phase.')
-    grpout.add_argument('--nsampwrite', default=100, help='Number of sample SEDs to write in case writesed is true.')
+    grpout.add_argument('--nsampwrite', default=100, type=int, help='Number of sample SEDs to write in case writesed is true.')
+    grpout.add_argument('--nsampplot',  default=100, type=int, help='Number of sample SEDs to plot in case writesed is true.')
     
     args = parser.parse_args()
     
@@ -695,7 +712,7 @@ if __name__ == "__main__":
                 mflux, mphot = temp.reconstruct_phot(meds, temp.ndims)
                 
                 if args.writesed:
-                   fwritesed(temp, obj, mphot, this_obj_z, args.funit, plotdir, nsamp, args.nsampwrite)
+                   fwritesed(temp, obj, mflux*temp.pivot_wl**2/temp.clight/(1E-26*fuscale), mphot, this_obj_bands, this_obj_z, args.funit, plotdir, nsamp, args.nsampwrite)
                 
                 #Compute photometric chisquare
                 oflux_lam = this_obj_flux* temp.clight/temp.pivot_wl**2
@@ -794,7 +811,7 @@ if __name__ == "__main__":
                    spec_chisq = [-1]
                 
                 #Set number and index of random samples
-                rsamples = np.random.randint(values.shape[0], size=args.nsampwrite)
+                rsamples = np.random.randint(values.shape[0], size=args.nsampplot)
                 phxmin = 0.8*np.nanmin(temp.pivot_wl/1e4)
                 phxmax = 1.2*np.nanmax(temp.pivot_wl/1e4)
     
@@ -803,14 +820,13 @@ if __name__ == "__main__":
                     stride = int(npoints/5000)
                 else:
                     stride = 1    
-                
-                
-                sfh_array = np.zeros((14000,args.nsampwrite))
-                age_array = np.zeros(args.nsampwrite, dtype=int) 
+                                
+                sfh_array = np.zeros((14000,args.nsampplot))
+                age_array = np.zeros(args.nsampplot, dtype=int) 
                 for ind,ii in enumerate(rsamples):
                     tsamp = values[ii,:-1]
                     tflux, tphot = temp.reconstruct_phot(tsamp, temp.ndims)
-                    
+
                     ax1.plot(temp.red_wl/1e4, tphot*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='firebrick', alpha=0.1, lw=0.6, rasterized=args.rasterize)
                     ax1.plot(temp.red_wl/1e4, temp.dusty_phot_young*10**tsamp[mstarind]*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='blue', alpha=0.1, lw=0.6, rasterized=args.rasterize)
                     ax1.plot(temp.red_wl/1e4, temp.dusty_phot_old*10**tsamp[mstarind]*temp.fscale*temp.red_wl*temp.flux_to_lum/temp.lsun, color='red' , alpha=0.1, lw=0.6, rasterized=args.rasterize)
