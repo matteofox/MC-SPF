@@ -37,7 +37,7 @@ class sps_spec_fitter:
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
             fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None, \
             sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, sfhpar1range = None, sfhpar2range=None, sfhpar3range=None, \
-            emimodel='2018', emimetal=0.02, dustemimodel='DH02', velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.,1.],\
+            emimodel='2018', emimetal=0.02, emimetalinterp=False, dustemimodel='DH02', velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.,1.],\
             useleitatt=False, spfunit = 1E-20):
         
         """ Class for dealing with MultiNest fitting """
@@ -65,6 +65,7 @@ class sps_spec_fitter:
         self.cropspec = cropspec
         self.polymax = polymax
         self.emimetal = emimetal
+        self.emimetalinterp = emimetalinterp
         self.spfunit = spfunit
         
         #constants
@@ -249,26 +250,83 @@ class sps_spec_fitter:
         iline = 0
         
       
-        metind = np.argmin(np.abs(metallist-self.emimetal))
-        print('      INFO: Emission line metallicity requested {}, found {:5.4f}'.format(self.emimetal,metallist[metind]))
-        
-        with open(modeldir+byler_fname,'r') as file:
-            for line in file:
-                if line[0] != '#':
-                    temp = (line.strip()).split(None)
-                    if not iline: #Read wave line
-                        self.emm_wls[:] = np.array(temp, dtype=float)
-                        iline = 1
-                    else:
-                        if rline: #Read line fluxes
-                            self.emm_scales[icnt%7,icnt//7,:] = np.array(temp, dtype=float)*self.lsun #output should be in erg/s/QHO
-                            icnt += 1
-                        if len(temp) == 3 and temp[0] == metalstrg[metind]:
-                            rline = 1
-                            self.emm_ages[icnt//7] = float(temp[1])/1e6
-                            self.emm_ions[icnt%7]  = float(temp[2])
+        if not self.emimetalinterp:
+            metind = np.argmin(np.abs(metallist-self.emimetal))
+            print('      INFO: Emission line metallicity requested {}, found {:5.4f}'.format(self.emimetal,metallist[metind]))
+            
+            with open(modeldir+byler_fname,'r') as file:
+                for line in file:
+                    if line[0] != '#':
+                        temp = (line.strip()).split(None)
+                        if not iline: #Read wave line
+                            self.emm_wls[:] = np.array(temp, dtype=float)
+                            iline = 1
                         else:
-                            rline = 0
+                            if rline: #Read line fluxes
+                                self.emm_scales[icnt%7,icnt//7,:] = np.array(temp, dtype=float)*self.lsun #output should be in erg/s/QHO
+                                icnt += 1
+                            if len(temp) == 3 and temp[0] == metalstrg[metind]:
+                                rline = 1
+                                self.emm_ages[icnt//7] = float(temp[1])/1e6
+                                self.emm_ions[icnt%7]  = float(temp[2])
+                            else:
+                                rline = 0
+        else:
+            if self.emimetal <= metallist[0]:
+                metind1, metind2 = 0, 0
+                weight1, weight2 = 1.0, 0.0
+            elif self.emimetal >= metallist[-1]:
+                metind1 = len(metallist) - 1
+                metind2 = len(metallist) - 1
+                weight1, weight2 = 1.0, 0.0
+            else:
+                metind2 = np.searchsorted(metallist, self.emimetal)
+                metind1 = metind2 - 1
+                weight2 = (self.emimetal - metallist[metind1]) / (metallist[metind2] - metallist[metind1])
+                weight1 = 1.0 - weight2
+            
+            print('      INFO: Emission line metallicity requested: {}. Interpolating between {:5.4f} (w={:.2f}) and {:5.4f} (w={:.2f})'.format(self.emimetal, metallist[metind1], weight1, metallist[metind2], weight2))
+            
+            emm_scales_1 = np.zeros_like(self.emm_scales)
+            emm_scales_2 = np.zeros_like(self.emm_scales)
+            
+            icnt1, icnt2 = 0, 0
+            rline1, rline2 = 0, 0
+            
+            with open(modeldir+byler_fname,'r') as file:
+                for line in file:
+                    if line[0] != '#':
+                        temp = (line.strip()).split(None)
+                        if not iline: #Read wave line
+                            self.emm_wls[:] = np.array(temp, dtype=float)
+                            iline = 1
+                        else:
+                            if rline1: #Read line fluxes
+                                emm_scales_1[icnt1%7,icnt1//7,:] = np.array(temp, dtype=float)*self.lsun
+                                icnt1 += 1
+                            if rline2:
+                                emm_scales_2[icnt2%7,icnt2//7,:] = np.array(temp, dtype=float)*self.lsun
+                                icnt2 += 1
+                                
+                            if len(temp) == 3:
+                                if temp[0] == metalstrg[metind1]:
+                                    rline1 = 1
+                                    self.emm_ages[icnt1//7] = float(temp[1])/1e6
+                                    self.emm_ions[icnt1%7]  = float(temp[2])
+                                else:
+                                    rline1 = 0
+                                    
+                                if temp[0] == metalstrg[metind2]:
+                                    rline2 = 1
+                                    self.emm_ages[icnt2//7] = float(temp[1])/1e6
+                                    self.emm_ions[icnt2%7]  = float(temp[2])
+                                else:
+                                    rline2 = 0
+                            else:
+                                rline1 = 0
+                                rline2 = 0
+
+            self.emm_scales = emm_scales_1 * weight1 + emm_scales_2 * weight2
         
         #thb = (self.emm_wls > 4860) & (self.emm_wls < 4864)
         #tha = (self.emm_wls > 6560) & (self.emm_wls < 6565)
