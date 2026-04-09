@@ -852,7 +852,7 @@ class sps_spec_fitter:
                 ntrans = ntrans/max(1e-70,td)
             
             #Calculate pivot wavelength following equation lam_pivot from SVO filter service
-            pivot_wl = np.sqrt(np.trapezoid(ntrans, self.red_wl) / np.trapezoid(ntrans / self.red_wl**2, self.red_wl))
+            pivot_wl = np.sqrt(np.trapezoid(ntrans*self.red_wl, self.red_wl) / np.trapezoid(ntrans / self.red_wl, self.red_wl))
             bands[ii,:] = ntrans
             pivot[ii] = pivot_wl
         
