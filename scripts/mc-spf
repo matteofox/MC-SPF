@@ -193,14 +193,18 @@ if __name__ == "__main__":
     
     grpplt = parser.add_argument_group('Plot related arguments')
     
-    grpplt.add_argument('--spxrange',   default= None,    help='X-axis (Wave) range for spectra plots')
+    grpplt.add_argument('--parxstr',   default= None,     help='X-axis parameter for SFH covariance plot')
+    grpplt.add_argument('--parystr',   default= None,     help='Y-axis parameter for SFH covariance plot')
+    grpplt.add_argument('--sptext',     default= None,    help='Text to be included in the top-right corner of the spectra plots')
+    grpplt.add_argument('--spxrange',   default= None,    help='X-axis (Wave) range for spectra plots (Unit: Angstrom)')
     grpplt.add_argument('--spyrange',   default= None,    help='Y-axis (Flux) range for spectra plots')
     grpinp.add_argument('--spfplot',    default= None,    help='The flux unit for plotting. Will be compared to the input unit and spectra will be scaled if required ')
-    grpplt.add_argument('--phxrange',   default= None,    help='X-axis (Wave) range for photometry plot')
+    grpplt.add_argument('--phxrange',   default= None,    help='X-axis (Wave) range for photometry plot (Unit: Angstrom)')
     grpplt.add_argument('--phyrange',   default= None,    help='Y-axis (Luminosity) range for photometry plot')
-    grpplt.add_argument('--timerange',  default= None,    help='X-axis (Time) range for SFH plot')
+    grpplt.add_argument('--timerange',  default= None,    help='X-axis (Time) range for SFH plot (Unit: Myr)')
     grpplt.add_argument('--rasterize', dest='rasterize', action='store_true', help='If set, will make smaller summary plots by rasterizing some lines.')
     grpplt.add_argument('--overrideid', default= None, help='If set to a string, this will be plot instead of the ID number.')
+    grpplt.add_argument('--overridetitle', default= None, help='If set to a string, this will be plot instead of the entire top row.')
     
     grpout = parser.add_argument_group('Output control arguments')
     
@@ -725,12 +729,18 @@ if __name__ == "__main__":
                 print('      RESULTS Reduced Phot Chi square: {0:7.3f}'.format(photo_chisq))
                 
                 #print(((oflux_lam-mflux)/oflux_err_lam)**2)
-                            
-                if np.isfinite(lnz) and np.isfinite(dlnz):
-                  fig.text(0.08, 0.94-0.005*temp.n_spec, '$\\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \\log(M_*) = {2:.2f} ~~~~~ \\log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f} ~~~~~ \\ln Z = {5:.2f}\\pm{6:.2f}$' \
-                         .format(obj, this_obj_z, meds[mstarind], medlsfr, meds[temp.sfh_npars+0], lnz, dlnz), transform=fig.transFigure)
+
+                if args.overridetitle:
+                  fig.text(0.08, 0.94-0.005*temp.n_spec, '${0}$'.format(args.overridetitle), transform=fig.transFigure)
                 else:
-                  fig.text(0.08, 0.94-0.005*temp.n_spec, '$\\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \\log(M_*) = {2:.2f} ~~~~~ \\log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f}$' \
+                  if args.overrideid:
+                    fig.text(0.08, 0.94-0.005*temp.n_spec, '${0}~~~~~ z = {1:.5f} ~~~~~ \\log(M_*) = {2:.2f} ~~~~~ \\log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f} ~~~~~ \\ln Z = {5:.2f}\\pm{6:.2f}$' \
+                         .format(args.overrideid, this_obj_z, meds[mstarind], medlsfr, meds[temp.sfh_npars+0], lnz, dlnz), transform=fig.transFigure)
+                  elif np.isfinite(lnz) and np.isfinite(dlnz):
+                    fig.text(0.08, 0.94-0.005*temp.n_spec, '$\\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \\log(M_*) = {2:.2f} ~~~~~ \\log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f} ~~~~~ \\ln Z = {5:.2f}\\pm{6:.2f}$' \
+                         .format(obj, this_obj_z, meds[mstarind], medlsfr, meds[temp.sfh_npars+0], lnz, dlnz), transform=fig.transFigure)
+                  else:
+                    fig.text(0.08, 0.94-0.005*temp.n_spec, '$\\mathrm{{ID}} = {0}~~~~~ z = {1:.5f} ~~~~~ \\log(M_*) = {2:.2f} ~~~~~ \\log(SFR) = {3:.3f} ~~~~~ A_V = {4:.2f}$' \
                          .format(obj, this_obj_z, meds[mstarind], medlsfr, meds[temp.sfh_npars+0]), transform=fig.transFigure)
                 
                 
@@ -751,6 +761,11 @@ if __name__ == "__main__":
                    else:
                       spxrange = np.array([-1,-1,-1,-1,-1,-1,-1,-1,-1,-1], dtype=float)
                    
+                   if args.sptext != None:
+                      sptext = np.array((args.sptext).split(','), dtype=str)
+                   else:
+                      sptext = np.array(['' for _ in range(temp.n_spec)], dtype=str)
+
                    spec_chisq = np.zeros(temp.n_spec)
                                      
                    for spid in range(temp.n_spec):
@@ -768,7 +783,8 @@ if __name__ == "__main__":
                        clean_spec = contspec*temp.spec_norm[spid]*spfscale 
                        
                        axsp[spid].plot(10**temp.log_wl[spid], totspec*temp.spec_norm[spid]*spfscale, '-', alpha=1.0, color='firebrick', lw=1.0, zorder=1.1)
-                       
+                       axsp[spid].text(0.97, 0.95, sptext[spid], transform=axsp[spid].transAxes, ha='right', va='top', fontsize=12)
+
                        if spyrange[2*spid] == -1 and spyrange[2*spid+1] == -1:
                           spyrange[2*spid]   = clean_spec.min()-0.1*np.ptp(clean_spec)
                           spyrange[2*spid+1] = clean_spec.max()+zoom*np.ptp(clean_spec)
@@ -898,27 +914,36 @@ if __name__ == "__main__":
                 ax4.set_ylabel('$SFR~\\mathrm{[M_\\odot~yr^{-1}]}$')
     
                         
-                #Plot Tquench Tauquench covariance plot
+                #Plot SFH covariance plot
                 corner.hist2d(values[:,1], values[:,0], ax=ax5)
                 ax5.axvline(meds[1], color='firebrick', lw=1)
                 ax5.axhline(meds[0], color='firebrick', lw=1)
-                
-                parx_str = sfh_pars[1].capitalize()
-                pary_str = sfh_pars[0].capitalize()
-                
-                if 'Age' in parx_str or 'Tau' in parx_str:
-                   parx_unit = '['+temp.timeunit+']'
+
+                if args.parxstr != None:
+                   parx_str = args.parxstr
+                   parx_unit = ''
                 else:
-                   parx_unit = ''   
+                   parx_str = sfh_pars[1].lower()
                 
-                if 'Age' in pary_str or 'Tau' in pary_str:
-                   pary_unit = '['+temp.timeunit+']'
+                   if 'age' in parx_str.lower() or 'tau' in parx_str.lower():
+                      parx_unit = '['+temp.timeunit+']'
+                   else:
+                      parx_unit = ''   
+                
+                if args.parystr != None:
+                   pary_str = args.parystr
+                   pary_unit= ''
                 else:
-                   pary_unit = ''   
+                   pary_str = sfh_pars[0].lower()
+
+                   if 'age' in pary_str.lower() or 'tau' in pary_str.lower():
+                      pary_unit = '['+temp.timeunit+']'
+                   else:
+                      pary_unit = ''   
                 
-                ax5.set_xlabel('$\\mathrm{{{}~{}}}$'.format(parx_str,parx_unit))
+                ax5.set_xlabel('${}~\\mathrm{{{}}}$'.format(parx_str,parx_unit))
     
-                ax5.set_ylabel('$\\mathrm{{{}~{}}}$'.format(pary_str,pary_unit))
+                ax5.set_ylabel('${}~\\mathrm{{{}}}$'.format(pary_str,pary_unit))
     
                 
                 pl.savefig(plotdir+'id{0}_summary.pdf'.format(obj), bbox_inches='tight')
