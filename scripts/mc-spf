@@ -185,6 +185,7 @@ if __name__ == "__main__":
     grpfit.add_argument('--sfhpar1range',    default= None,  help='SFH parameter 1 range. Default = Full range in the model grid')
     grpfit.add_argument('--sfhpar2range',    default= None,  help='SFH parameter 2 range. Default = Full range in the model grid (Only valid if model has 2 or 3 parameters)')
     grpfit.add_argument('--sfhpar3range',    default= None,  help='SFH parameter 3 range. Default = Full range in the model grid (Only valid if model has 3 parameters)')
+    grpfit.add_argument('--avrange',         default= None,  help='Dust attenuation for the old stars, in mag. Default = 0,4')
     grpfit.add_argument('--fescrange',       default= None,  help='Multiplicative escape fraction Default = -0.5,0.5')
     grpfit.add_argument('--sigrange',        default= None,  help='Stellar sigma range Default = 1,500')
     grpfit.add_argument('--velrange',        default= None,  help='Stellar velocity offset range w.r.t. redshift value in input file. Default = -250,250 \
@@ -371,11 +372,18 @@ if __name__ == "__main__":
     else:
        sigrange = np.array(args.sigrange.split(','), dtype=float)
     
+    if args.avrange is None:
+       avrange=[0.,4.]
+    else:
+       avrange = np.array(args.avrange.split(','), dtype=float)
+       print('INFO: Av user defined limits : {} {}'.format(avrange[0],avrange[1]))
+    
     if args.velrange is None:
        velrange=[-250.,250.]
     else:
        tmpstr = (args.velrange).replace('m','-')
        velrange = np.array(tmpstr.split(','), dtype=float)
+       print('INFO: Stellar velocity offset user defined limits : {} {}'.format(velrange[0],velrange[1]))
     
     if args.sfhpar1range is None:
        sfhpar1range = None
@@ -558,7 +566,7 @@ if __name__ == "__main__":
                    polymax=polymax, cosmo=cosmo, sfh_pars=sfh_pars, sfh_type=sfh_type, \
                    sfh_age_par = sfh_age_par, dl=dl, sfhpar1range=sfhpar1range, \
                    sfhpar2range=sfhpar2range,sfhpar3range=sfhpar3range,fescrange=fescrange,sigrange=sigrange,\
-                   velrange=velrange,emimetal=args.emimetal,emimetalinterp=args.emimetalinterp,emimodel=args.emimodel,dustemimodel=args.dustemimodel,\
+                   velrange=velrange,avrange=avrange,emimetal=args.emimetal,emimetalinterp=args.emimetalinterp,emimodel=args.emimodel,dustemimodel=args.dustemimodel,\
                    useleitatt=args.useleitatt, spfunit=spfunit) as temp:
         
               

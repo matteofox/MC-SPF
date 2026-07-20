@@ -37,7 +37,7 @@ class sps_spec_fitter:
             cropspec=[100,20000], spec_in=[None], res_in=[None], polymax=[20,20,20,20,20], \
             fit_spec=True, fit_phot=True, priorAext=None,  Gpriors=None, modeldir='./', filtdir='./', dl=None, cosmo=None, \
             sfh_pars=['TAU','AGE'], sfh_type='exp', sfh_age_par = -1, sfhpar1range = None, sfhpar2range=None, sfhpar3range=None, \
-            emimodel='2018', emimetal=0.02, emimetalinterp=False, dustemimodel='DH02', velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.,1.],\
+            emimodel='2018', emimetal=0.02, emimetalinterp=False, dustemimodel='DH02', avrange=[0.,4.],velrange=[-250.,250.], sigrange = [1,500.], fescrange=[0.,1.],\
             useleitatt=False, spfunit = 1E-20):
         
         """ Class for dealing with MultiNest fitting """
@@ -428,7 +428,7 @@ class sps_spec_fitter:
             this_sfhpar_lims = self.sanitize_sfhpar_lims(sfhparranges[pp],pp)
             self.bounds.append(this_sfhpar_lims)
                             
-        self.av_lims  = np.array((0., 5.))
+        self.av_lims  = np.array((avrange[0], avrange[1]))
         self.ext_lims = np.array((0., 5.))
         self.alpha_lims = np.array((self.dh_alpha[0], self.dh_alpha[-1]))
         self.mass_lims = np.array((3,12))
